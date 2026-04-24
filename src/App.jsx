@@ -14,6 +14,8 @@ import Invoices from './pages/Invoices'
 import InvoiceDetail from './pages/InvoiceDetail'
 import Settings from './pages/Settings'
 import BusinessDetails from './pages/settings/BusinessDetails'
+import PublicQuote from './pages/public/PublicQuote'
+import PublicInvoice from './pages/public/PublicInvoice'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -26,6 +28,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/q/:token" element={<PublicQuote />} />
+      <Route path="/i/:token" element={<PublicInvoice />} />
       <Route
         element={
           <RequireAuth>

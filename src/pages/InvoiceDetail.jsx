@@ -12,6 +12,7 @@ import ConfirmModal from '../components/ui/ConfirmModal'
 import LineItemsEditor from '../components/ui/LineItemsEditor'
 import NewInvoiceModal from '../components/modals/NewInvoiceModal'
 import { supabase } from '../lib/supabase'
+import { sendInvoiceEmail } from '../lib/sendEmail'
 import { badgeFor, INVOICE_STATUSES, labelFor } from '../lib/constants'
 import { currency, formatDate } from '../lib/utils'
 
@@ -30,6 +31,7 @@ export default function InvoiceDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [toast, setToast] = useState('')
+  const [sending, setSending] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,6 +65,26 @@ export default function InvoiceDetail() {
     navigator.clipboard?.writeText(url)
     setToast('Link copied')
     setTimeout(() => setToast(''), 1500)
+  }
+
+  async function sendByEmail() {
+    if (!invoice.customer?.email) {
+      setToast('Add a customer email first')
+      setTimeout(() => setToast(''), 2000)
+      return
+    }
+    setSending(true)
+    try {
+      await sendInvoiceEmail({ invoiceId: invoice.id, to: invoice.customer.email })
+      setToast(`Sent to ${invoice.customer.email}`)
+      setTimeout(() => setToast(''), 2500)
+      await load()
+    } catch (e) {
+      setToast(e.message || 'Send failed')
+      setTimeout(() => setToast(''), 3000)
+    } finally {
+      setSending(false)
+    }
   }
 
   if (loading) return null
@@ -142,7 +164,13 @@ export default function InvoiceDetail() {
 
           <div className="flex flex-wrap gap-2">
             {invoice.status === 'draft' && (
-              <Button size="sm" leftIcon={Send} onClick={() => setStatus('sent')}>Mark as sent</Button>
+              <Button size="sm" leftIcon={Send} loading={sending} onClick={sendByEmail}>Email to customer</Button>
+            )}
+            {invoice.status === 'draft' && (
+              <Button size="sm" variant="secondary" onClick={() => setStatus('sent')}>Mark sent (no email)</Button>
+            )}
+            {invoice.status === 'sent' && (
+              <Button size="sm" leftIcon={Send} loading={sending} onClick={sendByEmail}>Resend email</Button>
             )}
             {invoice.status !== 'paid' && (
               <Button size="sm" variant={invoice.status === 'draft' ? 'secondary' : 'primary'} leftIcon={CircleDollarSign} onClick={() => setStatus('paid')}>Mark paid</Button>

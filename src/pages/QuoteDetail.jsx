@@ -12,6 +12,7 @@ import ConfirmModal from '../components/ui/ConfirmModal'
 import LineItemsEditor from '../components/ui/LineItemsEditor'
 import NewQuoteModal from '../components/modals/NewQuoteModal'
 import { supabase } from '../lib/supabase'
+import { sendQuoteEmail } from '../lib/sendEmail'
 import { badgeFor, labelFor, QUOTE_STATUSES } from '../lib/constants'
 import { currency, formatDate } from '../lib/utils'
 
@@ -24,6 +25,7 @@ export default function QuoteDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [toast, setToast] = useState('')
+  const [sending, setSending] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,6 +65,26 @@ export default function QuoteDetail() {
     navigator.clipboard?.writeText(url)
     setToast('Link copied')
     setTimeout(() => setToast(''), 1500)
+  }
+
+  async function sendByEmail() {
+    if (!quote.customer?.email) {
+      setToast('Add a customer email first')
+      setTimeout(() => setToast(''), 2000)
+      return
+    }
+    setSending(true)
+    try {
+      await sendQuoteEmail({ quoteId: quote.id, to: quote.customer.email })
+      setToast(`Sent to ${quote.customer.email}`)
+      setTimeout(() => setToast(''), 2500)
+      await load()
+    } catch (e) {
+      setToast(e.message || 'Send failed')
+      setTimeout(() => setToast(''), 3000)
+    } finally {
+      setSending(false)
+    }
   }
 
   if (loading) return null
@@ -125,7 +147,13 @@ export default function QuoteDetail() {
 
           <div className="flex flex-wrap gap-2">
             {quote.status === 'draft' && (
-              <Button size="sm" leftIcon={Send} onClick={() => setStatus('sent')}>Mark as sent</Button>
+              <Button size="sm" leftIcon={Send} loading={sending} onClick={sendByEmail}>Email to customer</Button>
+            )}
+            {quote.status === 'draft' && (
+              <Button size="sm" variant="secondary" onClick={() => setStatus('sent')}>Mark sent (no email)</Button>
+            )}
+            {quote.status === 'sent' && (
+              <Button size="sm" leftIcon={Send} loading={sending} onClick={sendByEmail}>Resend email</Button>
             )}
             {['sent','draft'].includes(quote.status) && (
               <>
