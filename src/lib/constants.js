@@ -1,0 +1,50 @@
+export const GST_RATE = 0.15
+
+export const JOB_KINDS = [
+  { value: 'repair', label: 'Repair' },
+  { value: 'new', label: 'New job' },
+]
+
+export const JOB_TYPES = [
+  { value: 'maintenance', label: 'General maintenance', badge: 'default' },
+  { value: 'glass',       label: 'Glass replacement',   badge: 'primary' },
+  { value: 'hardware',    label: 'Hardware',            badge: 'warning' },
+  { value: 'glazing',     label: 'Retrofit glazing',    badge: 'success' },
+  { value: 'locks',       label: 'Door & window locks', badge: 'primary' },
+  { value: 'other',       label: 'Other',               badge: 'default' },
+]
+
+export const PROPERTY_TYPES = [
+  { value: 'residential', label: 'Residential' },
+  { value: 'commercial', label: 'Commercial' },
+]
+
+export const JOB_STATUSES = [
+  { value: 'scheduled',   label: 'Scheduled',   badge: 'default' },
+  { value: 'in_progress', label: 'In progress', badge: 'primary' },
+  { value: 'completed',   label: 'Completed',   badge: 'success' },
+  { value: 'cancelled',   label: 'Cancelled',   badge: 'danger' },
+]
+
+export const QUOTE_STATUSES = [
+  { value: 'draft',    label: 'Draft',    badge: 'default' },
+  { value: 'sent',     label: 'Sent',     badge: 'primary' },
+  { value: 'accepted', label: 'Accepted', badge: 'success' },
+  { value: 'declined', label: 'Declined', badge: 'danger' },
+  { value: 'expired',  label: 'Expired',  badge: 'warning' },
+]
+
+export const INVOICE_STATUSES = [
+  { value: 'draft',   label: 'Draft',   badge: 'default' },
+  { value: 'sent',    label: 'Sent',    badge: 'primary' },
+  { value: 'paid',    label: 'Paid',    badge: 'success' },
+  { value: 'overdue', label: 'Overdue', badge: 'danger' },
+]
+
+export function labelFor(list, value) {
+  return list.find(x => x.value === value)?.label ?? value
+}
+
+export function badgeFor(list, value) {
+  return list.find(x => x.value === value)?.badge ?? 'default'
+}
