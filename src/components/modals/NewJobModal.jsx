@@ -53,7 +53,8 @@ export default function NewJobModal({ open, onClose, onSaved, editing = null, pr
     setErr('')
     setForm(editing ? fromRecord(editing) : { ...EMPTY, ...(prefill || {}) })
     loadCustomers()
-  }, [open, editing, prefill, loadCustomers])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editing?.id])
 
   const isEditing = !!editing
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }))

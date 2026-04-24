@@ -46,7 +46,8 @@ export default function NewCustomerModal({
     if (!open) return
     setErr('')
     setForm(editing ? fromRecord(editing) : { ...EMPTY, ...(prefill || {}) })
-  }, [open, editing, prefill])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editing?.id])
 
   const isEditing = !!editing
 
