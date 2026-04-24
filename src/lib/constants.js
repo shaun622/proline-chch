@@ -6,12 +6,12 @@ export const JOB_KINDS = [
 ]
 
 export const JOB_TYPES = [
-  { value: 'maintenance', label: 'General maintenance', badge: 'default' },
-  { value: 'glass',       label: 'Glass replacement',   badge: 'primary' },
-  { value: 'hardware',    label: 'Hardware',            badge: 'warning' },
-  { value: 'glazing',     label: 'Retrofit glazing',    badge: 'success' },
-  { value: 'locks',       label: 'Door & window locks', badge: 'primary' },
-  { value: 'other',       label: 'Other',               badge: 'default' },
+  { value: 'maintenance', label: 'General maintenance', badge: 'default', color: 'gray',   icon: 'Wrench' },
+  { value: 'glass',       label: 'Glass replacement',   badge: 'primary', color: 'blue',   icon: 'Square' },
+  { value: 'hardware',    label: 'Hardware',            badge: 'warning', color: 'amber',  icon: 'Cog' },
+  { value: 'glazing',     label: 'Retrofit glazing',    badge: 'success', color: 'emerald', icon: 'Sparkles' },
+  { value: 'locks',       label: 'Door & window locks', badge: 'primary', color: 'violet', icon: 'Lock' },
+  { value: 'other',       label: 'Other',               badge: 'default', color: 'gray',   icon: 'Package' },
 ]
 
 export const PROPERTY_TYPES = [
