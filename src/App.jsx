@@ -6,6 +6,7 @@ import Home from './pages/Home'
 import Schedule from './pages/Schedule'
 import Jobs from './pages/Jobs'
 import Customers from './pages/Customers'
+import CustomerDetail from './pages/CustomerDetail'
 import Quotes from './pages/Quotes'
 import Invoices from './pages/Invoices'
 import Settings from './pages/Settings'
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/jobs" element={<Jobs />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/customers/:id" element={<CustomerDetail />} />
         <Route path="/quotes" element={<Quotes />} />
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/settings" element={<Settings />} />
