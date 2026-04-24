@@ -13,6 +13,7 @@ import QuoteDetail from './pages/QuoteDetail'
 import Invoices from './pages/Invoices'
 import InvoiceDetail from './pages/InvoiceDetail'
 import Settings from './pages/Settings'
+import BusinessDetails from './pages/settings/BusinessDetails'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/invoices/:id" element={<InvoiceDetail />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/business" element={<BusinessDetails />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -11,18 +11,9 @@ const SECTIONS = [
   {
     to: '/settings/business',
     label: 'Business details',
-    description: 'Name, contact, bank account, GST',
+    description: 'Name, contact, bank account, GST, document defaults',
     Icon: Building2,
     color: 'brand',
-    badge: 'Soon',
-  },
-  {
-    to: '/settings/quotes',
-    label: 'Quote & invoice defaults',
-    description: 'Numbering, footer, payment terms',
-    Icon: FileText,
-    color: 'indigo',
-    badge: 'Soon',
   },
 ]
 
