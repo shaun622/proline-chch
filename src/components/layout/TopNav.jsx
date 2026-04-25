@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { Home, Calendar, Wrench, Users, FileText, Receipt, Settings as SettingsIcon } from 'lucide-react'
 import { ThemeToggleCompact } from './ThemeToggle'
+import GlobalSearch from './GlobalSearch'
 import { cn } from '../../lib/utils'
 
 const TABS = [
@@ -16,7 +17,7 @@ export default function TopNav() {
   const location = useLocation()
   return (
     <header className="hidden md:block sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/60 dark:border-gray-800/60">
-      {/* Row 1: brand + (search placeholder) + theme + settings */}
+      {/* Row 1: brand + global search + theme + settings */}
       <div className="max-w-7xl mx-auto px-8 flex items-center gap-6 min-h-[60px]">
         <NavLink to="/" className="flex items-center gap-2.5 shrink-0">
           <img src="/logo.png" alt="ProLine Aluminium" className="w-8 h-8 object-contain dark:invert" />
@@ -25,8 +26,8 @@ export default function TopNav() {
             <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Repairs &amp; Alterations</p>
           </div>
         </NavLink>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1">
+        <GlobalSearch className="flex-1 max-w-2xl mx-auto" />
+        <div className="flex items-center gap-1 shrink-0">
           <ThemeToggleCompact />
           <NavLink
             to="/settings"
