@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Login() {
@@ -61,6 +61,11 @@ export default function Login() {
           <button type="submit" disabled={busy} className="btn-primary w-full">
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
+          <div className="text-center">
+            <Link to="/forgot-password" className="text-xs font-medium text-brand-700 dark:text-brand-300 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
         </form>
       </div>
     </div>

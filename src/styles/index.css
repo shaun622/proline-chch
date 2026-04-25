@@ -52,16 +52,22 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 min-h-tap min-w-tap px-5 py-3 text-sm tracking-wide focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98];
+    @apply inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200;
+    @apply min-h-tap min-w-tap px-5 py-3 text-sm tracking-wide;
+    @apply focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2;
+    @apply dark:focus:ring-offset-gray-950;
+    @apply disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98];
   }
   .btn-primary {
-    @apply btn bg-gradient-brand text-white shadow-md shadow-brand-500/20 hover:shadow-lg hover:brightness-110;
+    @apply btn bg-gradient-brand text-white shadow-md;
+    @apply hover:shadow-lg hover:brightness-110;
   }
   .btn-secondary {
-    @apply btn bg-white text-gray-700 border border-gray-200 shadow-card hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-800;
+    @apply btn bg-white text-gray-700 border border-gray-200 shadow-card hover:bg-gray-50;
+    @apply dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-800;
   }
   .btn-danger {
-    @apply btn bg-gradient-danger text-white shadow-md shadow-red-500/20 hover:brightness-110;
+    @apply btn bg-gradient-danger text-white shadow-md hover:brightness-110;
   }
 
   .input {
