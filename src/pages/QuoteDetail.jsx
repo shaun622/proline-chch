@@ -75,9 +75,14 @@ export default function QuoteDetail() {
     }
     setSending(true)
     try {
-      await sendQuoteEmail({ quoteId: quote.id, to: quote.customer.email })
-      setToast(`Sent to ${quote.customer.email}`)
-      setTimeout(() => setToast(''), 2500)
+      const res = await sendQuoteEmail({ quoteId: quote.id, to: quote.customer.email })
+      if (res?.warning === 'email_sent_status_update_failed') {
+        setToast('Sent — but status update failed. Refreshing.')
+        setTimeout(() => setToast(''), 4000)
+      } else {
+        setToast(`Sent to ${quote.customer.email}`)
+        setTimeout(() => setToast(''), 2500)
+      }
       await load()
     } catch (e) {
       setToast(e.message || 'Send failed')

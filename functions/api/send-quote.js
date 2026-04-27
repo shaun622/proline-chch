@@ -1,4 +1,4 @@
-import { verifyAuth, jsonResponse, supaHeaders, supaUrl, sendResendEmail, renderQuoteEmail } from '../_lib/email.js'
+import { verifyAuth, jsonResponse, supaHeaders, supaUrl, sendResendEmail, renderQuoteEmail, patchWithRetry } from '../_lib/email.js'
 
 export async function onRequest(context) {
   const { request, env } = context
@@ -42,13 +42,21 @@ export async function onRequest(context) {
     return jsonResponse({ error: 'Email failed', detail: String(err.message || err) }, 502)
   }
 
-  // Mark as sent
-  const patchRes = await fetch(`${base}/rest/v1/quotes?id=eq.${quoteId}`, {
-    method: 'PATCH',
-    headers: { ...headers, Prefer: 'return=representation' },
-    body: JSON.stringify({ status: 'sent', sent_at: new Date().toISOString() }),
-  })
-  const patched = await patchRes.json()
-
+  // Email is out the door — now mark as sent. Retry on transient failure so
+  // the customer never gets the email while the app still shows "draft".
+  // If retries exhaust, return ok:true with a warning so the UI can prompt
+  // the user to re-fetch / manually mark sent (instead of resending email).
+  const patched = await patchWithRetry(
+    `${base}/rest/v1/quotes?id=eq.${quoteId}`,
+    headers,
+    JSON.stringify({ status: 'sent', sent_at: new Date().toISOString() }),
+  )
+  if (!patched) {
+    return jsonResponse({
+      ok: true,
+      warning: 'email_sent_status_update_failed',
+      message: 'Email was sent, but the quote status could not be updated. Refresh the page; if it still shows draft, mark sent manually.',
+    })
+  }
   return jsonResponse({ ok: true, quote: Array.isArray(patched) ? patched[0] : patched })
 }

@@ -1,4 +1,4 @@
-import { verifyAuth, jsonResponse, supaHeaders, supaUrl, sendResendEmail, renderInvoiceEmail } from '../_lib/email.js'
+import { verifyAuth, jsonResponse, supaHeaders, supaUrl, sendResendEmail, renderInvoiceEmail, patchWithRetry } from '../_lib/email.js'
 
 export async function onRequest(context) {
   const { request, env } = context
@@ -42,12 +42,17 @@ export async function onRequest(context) {
     return jsonResponse({ error: 'Email failed', detail: String(err.message || err) }, 502)
   }
 
-  const patchRes = await fetch(`${base}/rest/v1/invoices?id=eq.${invoiceId}`, {
-    method: 'PATCH',
-    headers: { ...headers, Prefer: 'return=representation' },
-    body: JSON.stringify({ status: 'sent', sent_at: new Date().toISOString() }),
-  })
-  const patched = await patchRes.json()
-
+  const patched = await patchWithRetry(
+    `${base}/rest/v1/invoices?id=eq.${invoiceId}`,
+    headers,
+    JSON.stringify({ status: 'sent', sent_at: new Date().toISOString() }),
+  )
+  if (!patched) {
+    return jsonResponse({
+      ok: true,
+      warning: 'email_sent_status_update_failed',
+      message: 'Email was sent, but the invoice status could not be updated. Refresh the page; if it still shows draft, mark sent manually.',
+    })
+  }
   return jsonResponse({ ok: true, invoice: Array.isArray(patched) ? patched[0] : patched })
 }

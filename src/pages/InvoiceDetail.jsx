@@ -75,9 +75,14 @@ export default function InvoiceDetail() {
     }
     setSending(true)
     try {
-      await sendInvoiceEmail({ invoiceId: invoice.id, to: invoice.customer.email })
-      setToast(`Sent to ${invoice.customer.email}`)
-      setTimeout(() => setToast(''), 2500)
+      const res = await sendInvoiceEmail({ invoiceId: invoice.id, to: invoice.customer.email })
+      if (res?.warning === 'email_sent_status_update_failed') {
+        setToast('Sent — but status update failed. Refreshing.')
+        setTimeout(() => setToast(''), 4000)
+      } else {
+        setToast(`Sent to ${invoice.customer.email}`)
+        setTimeout(() => setToast(''), 2500)
+      }
       await load()
     } catch (e) {
       setToast(e.message || 'Send failed')

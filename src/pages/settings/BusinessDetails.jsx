@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Building2, CheckCircle2 } from 'lucide-react'
 import Header from '../../components/layout/Header'
 import PageWrapper from '../../components/layout/PageWrapper'
 import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
 import IconBox from '../../components/ui/IconBox'
+import Toast from '../../components/ui/Toast'
 import { Input, TextArea } from '../../components/ui/Input'
 import { supabase } from '../../lib/supabase'
 import { useBusiness } from '../../hooks/useBusiness'
@@ -29,7 +28,7 @@ export default function BusinessDetails() {
   const { business, loading, refresh } = useBusiness()
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState({ msg: '', kind: 'info' })
 
   useEffect(() => {
     if (!business) return
@@ -58,16 +57,16 @@ export default function BusinessDetails() {
         ...form,
         payment_terms_days: Number(form.payment_terms_days) || 14,
       }
-      if (business?.id) {
-        await supabase.from('business').update(payload).eq('id', business.id)
-      } else {
-        await supabase.from('business').insert(payload)
-      }
+      const { error } = business?.id
+        ? await supabase.from('business').update(payload).eq('id', business.id)
+        : await supabase.from('business').insert(payload)
+      if (error) throw error
       await refresh()
-      setToast('Saved')
-      setTimeout(() => setToast(''), 1500)
+      setToast({ msg: 'Saved', kind: 'success' })
+      setTimeout(() => setToast({ msg: '', kind: 'info' }), 1500)
     } catch (e) {
-      alert(e.message || 'Save failed')
+      setToast({ msg: e.message || 'Save failed', kind: 'error' })
+      setTimeout(() => setToast({ msg: '', kind: 'info' }), 3000)
     } finally {
       setSaving(false)
     }
@@ -123,15 +122,17 @@ export default function BusinessDetails() {
 
             <div className="flex items-center gap-3">
               <Button onClick={handleSave} loading={saving}>Save changes</Button>
-              {toast && (
+              {toast.kind === 'success' && toast.msg && (
                 <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> {toast}
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {toast.msg}
                 </span>
               )}
             </div>
           </div>
         )}
       </PageWrapper>
+
+      {toast.kind === 'error' && <Toast message={toast.msg} kind="error" />}
     </>
   )
 }

@@ -66,19 +66,32 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
     setJobs(js || [])
     setQuotes(qs || [])
     setBusiness(biz || null)
+    return biz || null
   }, [])
 
   useEffect(() => {
     if (!open) return
     setErr('')
-    if (editing) {
-      setForm(fromRecord(editing, editingLines))
-    } else {
+    let cancelled = false
+    ;(async () => {
+      const biz = await loadRefs()
+      if (cancelled) return
+      if (editing) {
+        setForm(fromRecord(editing, editingLines))
+        return
+      }
       const init = { ...EMPTY, ...(prefill || {}) }
-      if (!init.due_date) init.due_date = addDays(null, business?.payment_terms_days || 14)
+      if (!init.due_date) {
+        init.due_date = addDays(null, biz?.payment_terms_days || 14)
+      }
       setForm(init)
-    }
-    loadRefs()
+      // Auto-copy line items + customer when opened via "Convert to invoice"
+      // (URL carries ?quote=<id>, parent passes prefill={ quote_id }).
+      if (prefill?.quote_id) {
+        await copyFromQuote(prefill.quote_id)
+      }
+    })()
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing?.id])
 
@@ -134,24 +147,21 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
         const { data, error } = await supabase.from('invoices').update(header).eq('id', editing.id).select().single()
         if (error) throw error
         invoiceId = data.id
-        await supabase.from('invoice_line_items').delete().eq('invoice_id', invoiceId)
       } else {
         const { data, error } = await supabase.from('invoices').insert(header).select().single()
         if (error) throw error
         invoiceId = data.id
       }
-      if (form.lines.length > 0) {
-        const lineRows = form.lines.map((l, i) => ({
-          invoice_id: invoiceId,
-          description: l.description || '',
-          qty: Number(l.qty || 0),
-          unit_price: Number(l.unit_price || 0),
-          total: Number(l.qty || 0) * Number(l.unit_price || 0),
-          sort: i,
-        }))
-        const { error } = await supabase.from('invoice_line_items').insert(lineRows)
-        if (error) throw error
-      }
+      // Atomic line-item replace.
+      const linesPayload = form.lines.map((l, i) => ({
+        description: l.description || '',
+        qty: Number(l.qty || 0),
+        unit_price: Number(l.unit_price || 0),
+        total: Number(l.qty || 0) * Number(l.unit_price || 0),
+        sort: i,
+      }))
+      const { error: linesErr } = await supabase.rpc('replace_invoice_lines', { p_invoice_id: invoiceId, p_lines: linesPayload })
+      if (linesErr) throw linesErr
       const { data: fresh } = await supabase.from('invoices').select('*').eq('id', invoiceId).single()
       onSaved?.(fresh)
       onClose?.()

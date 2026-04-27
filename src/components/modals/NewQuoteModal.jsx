@@ -100,24 +100,22 @@ export default function NewQuoteModal({ open, onClose, onSaved, editing = null, 
         const { data, error } = await supabase.from('quotes').update(header).eq('id', editing.id).select().single()
         if (error) throw error
         quoteId = data.id
-        await supabase.from('quote_line_items').delete().eq('quote_id', quoteId)
       } else {
         const { data, error } = await supabase.from('quotes').insert(header).select().single()
         if (error) throw error
         quoteId = data.id
       }
-      if (form.lines.length > 0) {
-        const lineRows = form.lines.map((l, i) => ({
-          quote_id: quoteId,
-          description: l.description || '',
-          qty: Number(l.qty || 0),
-          unit_price: Number(l.unit_price || 0),
-          total: Number(l.qty || 0) * Number(l.unit_price || 0),
-          sort: i,
-        }))
-        const { error } = await supabase.from('quote_line_items').insert(lineRows)
-        if (error) throw error
-      }
+      // Atomic line-item replace — runs delete + insert inside a single RPC body
+      // so an insert failure can't leave the quote with no lines.
+      const linesPayload = form.lines.map((l, i) => ({
+        description: l.description || '',
+        qty: Number(l.qty || 0),
+        unit_price: Number(l.unit_price || 0),
+        total: Number(l.qty || 0) * Number(l.unit_price || 0),
+        sort: i,
+      }))
+      const { error: linesErr } = await supabase.rpc('replace_quote_lines', { p_quote_id: quoteId, p_lines: linesPayload })
+      if (linesErr) throw linesErr
       const { data: fresh } = await supabase.from('quotes').select('*').eq('id', quoteId).single()
       onSaved?.(fresh)
       onClose?.()

@@ -38,6 +38,31 @@ export function currencyNZD(n) {
   return Number(n || 0).toLocaleString('en-NZ', { style: 'currency', currency: 'NZD' })
 }
 
+// Retry a PATCH up to `attempts` times with linear backoff.
+// Returns parsed JSON on success, null on exhaustion.
+export async function patchWithRetry(url, headers, body, attempts = 3) {
+  let lastErr = null
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const r = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=representation' },
+        body,
+      })
+      if (r.ok) return await r.json()
+      lastErr = `HTTP ${r.status}`
+    } catch (e) {
+      lastErr = String(e?.message || e)
+    }
+    if (i < attempts - 1) {
+      await new Promise(res => setTimeout(res, 400 * (i + 1)))
+    }
+  }
+  // eslint-disable-next-line no-console
+  console.warn('patchWithRetry exhausted:', lastErr, url)
+  return null
+}
+
 export async function sendResendEmail({ env, to, subject, html, replyTo }) {
   const from = env.BUSINESS_EMAIL_FROM || 'ProLine Aluminium <onboarding@resend.dev>'
   const res = await fetch('https://api.resend.com/emails', {

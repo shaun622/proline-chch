@@ -3,6 +3,7 @@ import { Camera, Trash2, Upload, X } from 'lucide-react'
 import Button from './Button'
 import ConfirmModal from './ConfirmModal'
 import Badge from './Badge'
+import Toast from './Toast'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 
@@ -21,6 +22,12 @@ export default function JobPhotos({ jobId }) {
   const [deleting, setDeleting] = useState(null)
   const fileRef = useRef(null)
   const [pendingKind, setPendingKind] = useState('progress')
+  const [toast, setToast] = useState({ msg: '', kind: 'info' })
+
+  function showToast(msg, kind = 'error', ms = 3000) {
+    setToast({ msg, kind })
+    setTimeout(() => setToast({ msg: '', kind: 'info' }), ms)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -48,7 +55,7 @@ export default function JobPhotos({ jobId }) {
       }
       await load()
     } catch (err) {
-      alert(err.message || 'Upload failed')
+      showToast(err.message || 'Upload failed', 'error')
     } finally {
       setBusy(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -62,7 +69,7 @@ export default function JobPhotos({ jobId }) {
       await supabase.from('job_photos').delete().eq('id', photo.id)
       await load()
     } catch (err) {
-      alert(err.message || 'Delete failed')
+      showToast(err.message || 'Delete failed', 'error')
     }
   }
 
@@ -118,26 +125,29 @@ export default function JobPhotos({ jobId }) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {visible.map(p => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setViewing(p)}
-              className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 group"
-            >
-              <img src={p.url} alt={p.caption || ''} className="w-full h-full object-cover" loading="lazy" />
+            <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 group">
+              <button
+                type="button"
+                onClick={() => setViewing(p)}
+                aria-label={`View photo${p.caption ? ` — ${p.caption}` : ''}`}
+                className="absolute inset-0 w-full h-full focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-inset"
+              >
+                <img src={p.url} alt={p.caption || ''} className="w-full h-full object-cover" loading="lazy" />
+              </button>
               <span className="absolute top-1.5 left-1.5 pointer-events-none">
                 <Badge variant={p.kind === 'after' ? 'success' : p.kind === 'before' ? 'warning' : 'primary'}>
                   {p.kind}
                 </Badge>
               </span>
-              <span
-                onClick={e => { e.stopPropagation(); setDeleting(p) }}
-                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-lg bg-black/70 text-white flex items-center justify-center cursor-pointer"
-                aria-label="Delete"
+              <button
+                type="button"
+                onClick={() => setDeleting(p)}
+                aria-label="Delete photo"
+                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-lg bg-black/70 hover:bg-black/85 text-white flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white/60"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-              </span>
-            </button>
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -160,6 +170,8 @@ export default function JobPhotos({ jobId }) {
         description="This cannot be undone."
         confirmLabel="Delete"
       />
+
+      <Toast message={toast.msg} kind={toast.kind} />
     </div>
   )
 }
