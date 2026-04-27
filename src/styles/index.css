@@ -33,15 +33,22 @@
   }
 
   html, body { overscroll-behavior: none; }
+  /* Explicit bg here — `@apply bg-slate-50` in @layer base + `@apply bg-gray-950`
+     under `.dark body` had a real-browser cascade quirk where Tailwind's
+     emitted `body` rule sometimes shadowed the `.dark body` rule, leaving
+     dark-mode pages stuck on slate-50. Plain CSS sidesteps it. */
+  html { background-color: rgb(248 250 252); }
+  html.dark { background-color: rgb(3 7 18); }
   body {
     font-family: 'Inter Variable', system-ui, -apple-system, sans-serif;
     font-feature-settings: 'cv11', 'ss01';
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
-    @apply bg-slate-50 text-gray-900;
+    color: rgb(17 24 39);
+    background: transparent;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  .dark body { @apply bg-gray-950 text-gray-100; }
+  html.dark body { color: rgb(243 244 246); }
   ::selection { background-color: rgb(var(--brand-200)); color: rgb(var(--brand-900)); }
   .dark ::selection { background-color: rgb(var(--brand-800)); color: rgb(var(--brand-100)); }
 }
