@@ -290,7 +290,7 @@ insert into public.business (name, legal_name, email, phone, address, payment_te
 select
   'ProLine Aluminium',
   'ProLine Aluminium',
-  'michael@prolinealuminium.co.nz',
+  'michael@prolinechch.co.nz',
   '027 845 6163',
   'Christchurch & Canterbury',
   14,
