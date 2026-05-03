@@ -64,7 +64,12 @@ export async function patchWithRetry(url, headers, body, attempts = 3) {
 }
 
 export async function sendResendEmail({ env, to, subject, html, replyTo }) {
-  const from = env.BUSINESS_EMAIL_FROM || 'ProLine Aluminium <onboarding@resend.dev>'
+  // Fallback when BUSINESS_EMAIL_FROM isn't set — points at the
+  // verified prolinechch.co.nz Resend domain so a missing env var
+  // doesn't downgrade us to Resend's `onboarding@resend.dev` test
+  // address (which spam filters distrust). Production should always
+  // override via the Cloudflare Pages env var.
+  const from = env.BUSINESS_EMAIL_FROM || 'ProLine Aluminium <michael@prolinechch.co.nz>'
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
