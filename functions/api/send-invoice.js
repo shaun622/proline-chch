@@ -19,7 +19,7 @@ export async function onRequest(context) {
 
   const [invRes, bizRes] = await Promise.all([
     fetch(`${base}/rest/v1/invoices?id=eq.${invoiceId}&select=*,customer:customer_id(id,name,email)`, { headers }),
-    fetch(`${base}/rest/v1/business?select=*&limit=1`, { headers }),
+    fetch(`${base}/rest/v1/businesses?select=*&limit=1`, { headers }),
   ])
   const invoices = await invRes.json()
   const biz = await bizRes.json()
