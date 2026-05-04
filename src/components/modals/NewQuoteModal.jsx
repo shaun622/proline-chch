@@ -50,7 +50,7 @@ export default function NewQuoteModal({ open, onClose, onSaved, editing = null, 
     const [{ data: cs }, { data: js }, { data: biz }] = await Promise.all([
       supabase.from('customers').select('id, name').order('name'),
       supabase.from('jobs').select('id, title, customer_id').order('created_at', { ascending: false }).limit(100),
-      supabase.from('business').select('*').limit(1).maybeSingle(),
+      supabase.from('businesses').select('*').limit(1).maybeSingle(),
     ])
     setCustomers(cs || [])
     setJobs(js || [])

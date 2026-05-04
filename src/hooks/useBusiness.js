@@ -6,7 +6,7 @@ export function useBusiness() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('business').select('*').order('created_at', { ascending: true }).limit(1).maybeSingle()
+    const { data } = await supabase.from('businesses').select('*').order('created_at', { ascending: true }).limit(1).maybeSingle()
     setBusiness(data ?? null)
     setLoading(false)
   }, [])

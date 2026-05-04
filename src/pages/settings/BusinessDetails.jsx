@@ -58,8 +58,8 @@ export default function BusinessDetails() {
         payment_terms_days: Number(form.payment_terms_days) || 14,
       }
       const { error } = business?.id
-        ? await supabase.from('business').update(payload).eq('id', business.id)
-        : await supabase.from('business').insert(payload)
+        ? await supabase.from('businesses').update(payload).eq('id', business.id)
+        : await supabase.from('businesses').insert(payload)
       if (error) throw error
       await refresh()
       setToast({ msg: 'Saved', kind: 'success' })
