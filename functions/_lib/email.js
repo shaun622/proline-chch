@@ -95,6 +95,9 @@ export function renderQuoteEmail({ quote, business, customer, portalUrl }) {
   const name = customer?.name?.split(' ')[0] || 'there'
   const brand = business?.name || 'ProLine Aluminium'
   const total = currencyNZD(quote.total)
+  // Hide the "incl. GST" caption for unregistered businesses — quote
+  // was saved with rate=0 so the total IS the subtotal.
+  const gstCaption = Number(quote.gst_rate) > 0 ? 'incl. GST' : ''
   const validUntil = quote.valid_until ? new Date(quote.valid_until).toLocaleDateString('en-NZ', { year: 'numeric', month: 'short', day: 'numeric' }) : null
 
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f8fafc;">
@@ -108,7 +111,7 @@ export function renderQuoteEmail({ quote, business, customer, portalUrl }) {
         <tr><td style="padding:24px 28px;">
           <p style="margin:0 0 12px;font-size:15px;line-height:1.55;">Hi ${escapeHtml(name)},</p>
           <p style="margin:0 0 12px;font-size:15px;line-height:1.55;">Thanks for the chance to quote${quote.title ? ` on <strong>${escapeHtml(quote.title)}</strong>` : ''}. The full breakdown is on the link below.</p>
-          <p style="margin:0 0 20px;font-size:15px;"><strong style="font-size:18px;">${total}</strong> <span style="color:#6b7280;font-size:13px;">incl. GST</span></p>
+          <p style="margin:0 0 20px;font-size:15px;"><strong style="font-size:18px;">${total}</strong>${gstCaption ? ` <span style="color:#6b7280;font-size:13px;">${gstCaption}</span>` : ''}</p>
           <p style="margin:0 0 24px;">
             <a href="${escapeAttr(portalUrl)}" style="display:inline-block;background:linear-gradient(135deg,#5E6875 0%,#3F4650 100%);color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">View &amp; accept quote →</a>
           </p>
@@ -128,6 +131,8 @@ export function renderInvoiceEmail({ invoice, business, customer, portalUrl }) {
   const name = customer?.name?.split(' ')[0] || 'there'
   const brand = business?.name || 'ProLine Aluminium'
   const total = currencyNZD(invoice.total)
+  // Hide the "incl. GST" caption for invoices issued without GST.
+  const gstCaption = Number(invoice.gst_rate) > 0 ? 'incl. GST' : ''
   const due = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-NZ', { year: 'numeric', month: 'short', day: 'numeric' }) : null
 
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f8fafc;">
@@ -141,7 +146,7 @@ export function renderInvoiceEmail({ invoice, business, customer, portalUrl }) {
         <tr><td style="padding:24px 28px;">
           <p style="margin:0 0 12px;font-size:15px;line-height:1.55;">Hi ${escapeHtml(name)},</p>
           <p style="margin:0 0 12px;font-size:15px;line-height:1.55;">Your invoice${invoice.title ? ` for <strong>${escapeHtml(invoice.title)}</strong>` : ''} is ready.</p>
-          <p style="margin:0 0 6px;font-size:15px;"><strong style="font-size:18px;">${total}</strong> <span style="color:#6b7280;font-size:13px;">incl. GST</span></p>
+          <p style="margin:0 0 6px;font-size:15px;"><strong style="font-size:18px;">${total}</strong>${gstCaption ? ` <span style="color:#6b7280;font-size:13px;">${gstCaption}</span>` : ''}</p>
           ${due ? `<p style="margin:0 0 20px;font-size:13px;color:#6b7280;">Due ${escapeHtml(due)}.</p>` : ''}
           <p style="margin:0 0 24px;">
             <a href="${escapeAttr(portalUrl)}" style="display:inline-block;background:linear-gradient(135deg,#5E6875 0%,#3F4650 100%);color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">View invoice →</a>

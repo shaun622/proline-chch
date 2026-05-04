@@ -95,7 +95,8 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
         if (biz?.bank_account) parts.push(`Direct credit:\n${biz.bank_account}`)
         const days = biz?.payment_terms_days || 14
         parts.push(`Payment due within ${days} days. Please use the invoice number as the reference.`)
-        if (biz?.gst_number) parts.push(`GST: ${biz.gst_number}`)
+        // Only mention GST if the business actually charges it.
+        if (biz?.gst_enabled !== false && biz?.gst_number) parts.push(`GST: ${biz.gst_number}`)
         init.notes = parts.join('\n\n')
       }
       setForm(init)
@@ -113,10 +114,15 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const filteredJobs = form.customer_id ? jobs.filter(j => j.customer_id === form.customer_id) : jobs
   const filteredQuotes = form.customer_id ? quotes.filter(q => q.customer_id === form.customer_id) : quotes
-  // Per-business GST rate (decimal). Falls back to the constant for
-  // legacy rows that predate Settings → Tax & payment → GST rate.
-  // numeric(5,4) arrives as a string from PostgREST so coerce.
-  const gstRate = business?.gst_rate != null ? Number(business.gst_rate) : GST_RATE
+  // Per-business GST rate (decimal). When the business has GST
+  // disabled (unregistered), force rate=0 — the doc gets a 0%/$0
+  // GST line that totals + display logic can hide entirely.
+  // Falls back to the constant for legacy rows that predate
+  // Settings → Tax & payment → GST rate. numeric(5,4) arrives as a
+  // string from PostgREST so coerce.
+  const gstRate = business?.gst_enabled === false
+    ? 0
+    : (business?.gst_rate != null ? Number(business.gst_rate) : GST_RATE)
 
   async function copyFromQuote(quoteId) {
     if (!quoteId) return
@@ -204,7 +210,7 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
           <IconBox icon={Receipt} color="emerald" size="lg" />
           <div className="min-w-0">
             <p className="text-sm text-gray-700 dark:text-gray-300">{isEditing ? 'Update the invoice details' : 'Invoice number assigned on save'}</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">GST {+(gstRate * 100).toFixed(2)}% applied automatically.</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{gstRate > 0 ? `GST ${+(gstRate * 100).toFixed(2)}% applied automatically.` : 'No GST charged.'}</p>
           </div>
         </div>
 

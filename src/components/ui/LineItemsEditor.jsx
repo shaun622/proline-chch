@@ -112,10 +112,14 @@ export default function LineItemsEditor({ lines, onChange, gstRate = GST_RATE, r
           <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
           <span className="tabular-nums font-medium">{currency(totals.subtotal)}</span>
         </div>
-        <div className="flex items-center justify-between text-sm py-0.5">
-          <span className="text-gray-500 dark:text-gray-400">GST ({Math.round(gstRate * 100)}%)</span>
-          <span className="tabular-nums font-medium">{currency(totals.gst_amount)}</span>
-        </div>
+        {/* Hide GST row when rate is 0 (business is unregistered or
+            opted out via Settings → Tax & payment → Charge GST). */}
+        {gstRate > 0 && (
+          <div className="flex items-center justify-between text-sm py-0.5">
+            <span className="text-gray-500 dark:text-gray-400">GST ({Math.round(gstRate * 100)}%)</span>
+            <span className="tabular-nums font-medium">{currency(totals.gst_amount)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between text-base font-semibold pt-2 mt-2 border-t border-gray-100 dark:border-gray-800">
           <span>Total</span>
           <span className="tabular-nums">{currency(totals.total)}</span>

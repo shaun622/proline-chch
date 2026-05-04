@@ -15,6 +15,11 @@ const EMPTY = {
   email: '',
   phone: '',
   address: '',
+  // gst_enabled is the master switch: false means we're not GST-
+  // registered, so new docs save with rate=0 and the GST line is
+  // hidden in totals / PDFs / emails. Toggling this off keeps the
+  // entered rate around so flipping back on is one click.
+  gst_enabled: true,
   gst_number: '',
   // GST rate stored as a decimal (0.15 = 15%) but edited in the form
   // as a percentage so the operator types "15" instead of "0.15".
@@ -42,6 +47,10 @@ export default function BusinessDetails() {
       email: business.email || '',
       phone: business.phone || '',
       address: business.address || '',
+      // gst_enabled may not be present on legacy rows that predate
+      // migration 010 — treat absence as "registered" (current
+      // behaviour) so we don't silently strip GST off active accounts.
+      gst_enabled: business.gst_enabled !== false,
       gst_number: business.gst_number || '',
       // Decimal → percent for editing. business.gst_rate may arrive as
       // a string ("0.1500") from PostgREST numeric, so coerce.
@@ -60,13 +69,17 @@ export default function BusinessDetails() {
   async function handleSave() {
     setSaving(true)
     try {
+      // Convert percent → decimal. Use Number.isFinite so an empty
+      // field falls back to 15%, but explicit 0 is preserved (the
+      // previous `|| 15` snapped any 0 back to 15, which was the bug
+      // the operator hit when trying to disable GST by typing 0).
+      const pct = Number(form.gst_rate_percent)
+      const gstRate = Number.isFinite(pct) ? Math.max(0, Math.min(1, pct / 100)) : 0.15
       const payload = {
         ...form,
         payment_terms_days: Number(form.payment_terms_days) || 14,
-        // Convert percent → decimal for storage. Clamp to [0, 1] in
-        // case the operator types something silly like 150 — don't want
-        // a 1.5 gst_rate slipping into invoices.
-        gst_rate: Math.max(0, Math.min(1, (Number(form.gst_rate_percent) || 15) / 100)),
+        gst_enabled: !!form.gst_enabled,
+        gst_rate: gstRate,
       }
       // Strip the UI-only percent field so it doesn't reach the row.
       delete payload.gst_rate_percent
@@ -112,9 +125,40 @@ export default function BusinessDetails() {
 
             <div className="space-y-4">
               <h2 className="section-title">Tax & payment</h2>
+
+              {/* GST toggle — disabled state greys the rate + number
+                  inputs but keeps their values around so flipping back
+                  on doesn't lose the operator's settings. */}
+              <div className="flex items-start justify-between gap-4 rounded-2xl border border-gray-200 dark:border-gray-800 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Charge GST</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {form.gst_enabled
+                      ? 'New quotes and invoices include GST at the rate below.'
+                      : "Off — new quotes and invoices won't include GST. Turn on once you're GST-registered."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.gst_enabled}
+                  onClick={() => update('gst_enabled', !form.gst_enabled)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${form.gst_enabled ? 'bg-brand-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                >
+                  <span
+                    aria-hidden
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform translate-y-0.5 ${form.gst_enabled ? 'translate-x-[1.375rem]' : 'translate-x-0.5'}`}
+                  />
+                </button>
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
-                <Input label="GST number" value={form.gst_number} onChange={e => update('gst_number', e.target.value)} placeholder="123-456-789" />
-                <Input label="GST rate (%)" type="number" min="0" max="100" step="0.1" value={form.gst_rate_percent} onChange={e => update('gst_rate_percent', e.target.value)} placeholder="15" />
+                <div className={form.gst_enabled ? '' : 'opacity-50 pointer-events-none'}>
+                  <Input label="GST number" value={form.gst_number} onChange={e => update('gst_number', e.target.value)} placeholder="123-456-789" disabled={!form.gst_enabled} />
+                </div>
+                <div className={form.gst_enabled ? '' : 'opacity-50 pointer-events-none'}>
+                  <Input label="GST rate (%)" type="number" min="0" max="100" step="0.1" value={form.gst_rate_percent} onChange={e => update('gst_rate_percent', e.target.value)} placeholder="15" disabled={!form.gst_enabled} />
+                </div>
                 <Input label="Payment terms (days)" type="number" min="0" value={form.payment_terms_days} onChange={e => update('payment_terms_days', e.target.value)} />
               </div>
               <TextArea label="Bank account for direct credit" rows={2} value={form.bank_account} onChange={e => update('bank_account', e.target.value)} placeholder="Bank — 12-3456-7890123-00" />

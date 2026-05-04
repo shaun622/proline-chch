@@ -110,7 +110,10 @@ export default function PublicInvoice() {
           </div>
           <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Subtotal</span><span className="tabular-nums">{currency(invoice.subtotal)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">GST ({Math.round(Number(invoice.gst_rate) * 100)}%)</span><span className="tabular-nums">{currency(invoice.gst_amount)}</span></div>
+            {/* Hide GST row for docs issued without GST (rate is 0 — operator wasn't GST-registered at issue time). */}
+            {Number(invoice.gst_rate) > 0 && (
+              <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">GST ({Math.round(Number(invoice.gst_rate) * 100)}%)</span><span className="tabular-nums">{currency(invoice.gst_amount)}</span></div>
+            )}
             <div className="flex justify-between font-semibold text-base pt-1 border-t border-gray-100 dark:border-gray-800"><span>Total</span><span className="tabular-nums">{currency(invoice.total)}</span></div>
           </div>
         </Card>
