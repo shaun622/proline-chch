@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Receipt, Search, User, AlertCircle } from 'lucide-react'
+import { Download, Plus, Receipt, Search, User, AlertCircle } from 'lucide-react'
 import PageWrapper from '../components/layout/PageWrapper'
 import PageHero from '../components/layout/PageHero'
 import Button from '../components/ui/Button'
@@ -69,6 +69,47 @@ export default function Invoices() {
 
   const outstanding = useMemo(() => invoices.filter(r => r.status !== 'paid' && r.status !== 'draft').reduce((s, r) => s + Number(r.total || 0), 0), [invoices])
 
+  // CSV export of the *filtered* visible list — what's on screen
+  // drives what's exported, so the operator can scope to e.g. "paid
+  // only" for the accountant. One row per invoice (header data, not
+  // line items — line items belong on the per-invoice PDF).
+  const csvCell = (v) => {
+    if (v == null) return ''
+    const s = String(v)
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  function exportCsv() {
+    const header = [
+      'Invoice number', 'Title', 'Customer', 'Status',
+      'Issued date', 'Due date', 'Paid date',
+      'Subtotal', 'GST', 'GST rate', 'Total', 'Paid amount',
+    ]
+    const rows = visible.map(row => [
+      row.number || '',
+      row.title || '',
+      row.customer?.name || '',
+      isOverdue(row) ? 'Overdue' : labelFor(INVOICE_STATUSES, row.status),
+      row.issued_date ? String(row.issued_date).slice(0, 10) : (row.created_at ? String(row.created_at).slice(0, 10) : ''),
+      row.due_date || '',
+      row.paid_date ? String(row.paid_date).slice(0, 10) : '',
+      Number(row.subtotal || 0).toFixed(2),
+      Number(row.gst_amount || 0).toFixed(2),
+      row.gst_rate != null ? `${(Number(row.gst_rate) * 100).toFixed(2)}%` : '',
+      Number(row.total || 0).toFixed(2),
+      Number(row.paid_amount || 0).toFixed(2),
+    ])
+    const csv = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n')
+    // UTF-8 BOM so Excel opens it cleanly with macrons / non-ASCII names.
+    const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const today = new Date().toISOString().slice(0, 10)
+    a.download = `proline-invoices-${filter}-${today}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const [prefill, setPrefill] = useState(null)
   useEffect(() => {
     (async () => {
@@ -88,7 +129,14 @@ export default function Invoices() {
       <PageHero
         title="Invoices"
         subtitle={loading ? 'Loading…' : `${invoices.length} invoice${invoices.length === 1 ? '' : 's'}${outstanding > 0 ? ` · ${currency(outstanding)} outstanding` : ''}`}
-        action={<Button leftIcon={Plus} onClick={() => setCreateOpen(true)}>New Invoice</Button>}
+        action={
+          <div className="flex items-center gap-2">
+            {invoices.length > 0 && (
+              <Button leftIcon={Download} variant="secondary" onClick={exportCsv}>Export</Button>
+            )}
+            <Button leftIcon={Plus} onClick={() => setCreateOpen(true)}>New Invoice</Button>
+          </div>
+        }
       />
 
       <div className="relative mb-4">
