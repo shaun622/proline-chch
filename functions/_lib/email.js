@@ -146,7 +146,18 @@ export function renderInvoiceEmail({ invoice, business, customer, portalUrl }) {
           <p style="margin:0 0 24px;">
             <a href="${escapeAttr(portalUrl)}" style="display:inline-block;background:linear-gradient(135deg,#5E6875 0%,#3F4650 100%);color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">View invoice →</a>
           </p>
-          ${business?.bank_account ? `<p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Direct credit:</strong></p><p style="margin:0 0 16px;font-size:13px;color:#374151;white-space:pre-wrap;">${escapeHtml(business.bank_account)}</p><p style="margin:0 0 16px;font-size:12px;color:#6b7280;">Please use <strong>${escapeHtml(invoice.number)}</strong> as the reference.</p>` : ''}
+          ${invoice.notes
+            // New invoices have the notes pre-filled from Settings
+            // (bank account + payment terms + GST). Render that as
+            // the payment-info block so the operator's per-invoice
+            // edits actually reach the customer.
+            ? `<div style="margin:0 0 16px;padding:12px 14px;background:#f9fafb;border-radius:8px;font-size:13px;color:#374151;white-space:pre-wrap;line-height:1.55;">${escapeHtml(invoice.notes)}</div>`
+            // Legacy fallback for invoices created before notes
+            // pre-fill landed: still render the auto-bank block so
+            // those customers don't lose their payment info.
+            : business?.bank_account
+              ? `<p style="margin:0 0 6px;font-size:13px;color:#374151;"><strong>Direct credit:</strong></p><p style="margin:0 0 16px;font-size:13px;color:#374151;white-space:pre-wrap;">${escapeHtml(business.bank_account)}</p><p style="margin:0 0 16px;font-size:12px;color:#6b7280;">Please use <strong>${escapeHtml(invoice.number)}</strong> as the reference.</p>`
+              : ''}
           <p style="margin:0;font-size:14px;line-height:1.55;color:#374151;">Any questions, hit reply or give us a call.</p>
         </td></tr>
         <tr><td style="padding:18px 28px;border-top:1px solid #f3f4f6;font-size:12px;color:#6b7280;">

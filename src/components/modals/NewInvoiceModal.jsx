@@ -84,6 +84,20 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
       if (!init.due_date) {
         init.due_date = addDays(null, biz?.payment_terms_days || 14)
       }
+      // Pre-fill notes / payment info with the business defaults from
+      // Settings → Tax & Payment so the operator doesn't retype the
+      // same payment instructions on every invoice. Only fires when
+      // notes are empty — prefill or copyFromQuote can still
+      // overwrite. If the operator clears the field, that's their
+      // call: we re-fill only on a fresh-open of the modal.
+      if (!init.notes) {
+        const parts = []
+        if (biz?.bank_account) parts.push(`Direct credit:\n${biz.bank_account}`)
+        const days = biz?.payment_terms_days || 14
+        parts.push(`Payment due within ${days} days. Please use the invoice number as the reference.`)
+        if (biz?.gst_number) parts.push(`GST: ${biz.gst_number}`)
+        init.notes = parts.join('\n\n')
+      }
       setForm(init)
       // Auto-copy line items + customer when opened via "Convert to invoice"
       // (URL carries ?quote=<id>, parent passes prefill={ quote_id }).
