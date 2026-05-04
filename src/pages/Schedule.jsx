@@ -216,6 +216,7 @@ export default function Schedule() {
               days={days}
               byDay={byDay}
               today={todayMid}
+              selectedDay={selectedDay}
               onJobClick={(j) => setOpenJob(j)}
               onFocusDay={focusDay}
             />
@@ -255,31 +256,40 @@ export default function Schedule() {
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {selectedDayJobs.map(j => (
-                    <li key={j.id}>
-                      <button
-                        onClick={() => setOpenJob(j)}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <Badge variant={badgeFor(JOB_TYPES, j.job_type)}>{labelFor(JOB_TYPES, j.job_type)}</Badge>
-                            </div>
-                            <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
-                            </p>
-                            {j.customer?.address && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                                {[j.customer.address, j.customer.suburb].filter(Boolean).join(', ')}
+                  {selectedDayJobs.map(j => {
+                    const isCompleted = j.status === 'completed'
+                    return (
+                      <li key={j.id}>
+                        <button
+                          onClick={() => setOpenJob(j)}
+                          className={cn(
+                            'w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors',
+                            isCompleted && 'opacity-60 hover:opacity-100',
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <Badge variant={badgeFor(JOB_TYPES, j.job_type)}>{labelFor(JOB_TYPES, j.job_type)}</Badge>
+                              </div>
+                              <p className={cn(
+                                'font-medium text-gray-900 dark:text-gray-100 truncate',
+                                isCompleted && 'line-through',
+                              )}>
+                                {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
                               </p>
-                            )}
+                              {j.customer?.address && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                  {[j.customer.address, j.customer.suburb].filter(Boolean).join(', ')}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant={badgeFor(JOB_STATUSES, j.status)} dot>{labelFor(JOB_STATUSES, j.status)}</Badge>
                           </div>
-                          <Badge variant={badgeFor(JOB_STATUSES, j.status)} dot>{labelFor(JOB_STATUSES, j.status)}</Badge>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </Card>
@@ -299,19 +309,21 @@ export default function Schedule() {
 }
 
 // ─── Week grid (7 day columns) ─────────────────
-function WeekGrid({ days, byDay, today, onJobClick, onFocusDay }) {
+function WeekGrid({ days, byDay, today, selectedDay, onJobClick, onFocusDay }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-card border border-gray-100 dark:border-gray-800 overflow-hidden">
       <div className="grid grid-cols-7 divide-x divide-gray-100 dark:divide-gray-800">
         {days.map(day => {
           const list = byDay.get(ymd(day)) || []
           const isToday = sameDay(day, today)
+          const isSelected = selectedDay && sameDay(day, selectedDay)
           return (
             <DayColumn
               key={ymd(day)}
               day={day}
               jobs={list}
               isToday={isToday}
+              isSelected={isSelected}
               onJobClick={onJobClick}
               onFocusDay={onFocusDay}
             />
@@ -322,7 +334,7 @@ function WeekGrid({ days, byDay, today, onJobClick, onFocusDay }) {
   )
 }
 
-function DayColumn({ day, jobs, isToday, onJobClick, onFocusDay }) {
+function DayColumn({ day, jobs, isToday, isSelected, onJobClick, onFocusDay }) {
   const dow = day.toLocaleDateString('en-NZ', { weekday: 'short' }).toUpperCase()
   const visible = jobs.slice(0, MAX_VISIBLE_STOPS_PER_DAY)
   const hiddenCount = Math.max(0, jobs.length - visible.length)
@@ -335,7 +347,11 @@ function DayColumn({ day, jobs, isToday, onJobClick, onFocusDay }) {
           onClick={() => onFocusDay?.(day)}
           className={cn(
             'text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50',
-            isToday && 'bg-brand-50/60 dark:bg-brand-950/20',
+            // Selection follows the operator's click. Today keeps its
+            // brand-coloured date number (below) regardless, so today
+            // is always identifiable even when a different day is
+            // selected.
+            isSelected && 'bg-brand-50 dark:bg-brand-950/30 ring-1 ring-inset ring-brand-200/70 dark:ring-brand-800/40',
           )}
           aria-label={`Open all ${count} jobs for ${day.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}`}
         >
@@ -358,7 +374,7 @@ function DayColumn({ day, jobs, isToday, onJobClick, onFocusDay }) {
       ) : (
         <div className={cn(
           'px-3 py-2 border-b border-gray-100 dark:border-gray-800',
-          isToday && 'bg-brand-50/60 dark:bg-brand-950/20',
+          isSelected && 'bg-brand-50 dark:bg-brand-950/30 ring-1 ring-inset ring-brand-200/70 dark:ring-brand-800/40',
         )}>
           <p className={cn(
             'text-[10px] font-semibold uppercase tracking-wider',
@@ -394,14 +410,23 @@ function DayColumn({ day, jobs, isToday, onJobClick, onFocusDay }) {
   )
 }
 
-// Compact card for the week-grid columns.
+// Compact card for the week-grid columns. Completed jobs render at
+// reduced opacity so a busy day visually separates "done" from
+// "still to do".
 function InlineJobCard({ j, onClick }) {
+  const isCompleted = j.status === 'completed'
   return (
     <button
       onClick={onClick}
-      className="block w-full text-left bg-brand-50/70 dark:bg-brand-950/30 border-l-[3px] border-brand-500 rounded-md px-2 py-1.5 hover:bg-brand-100/70 dark:hover:bg-brand-950/50 transition-colors"
+      className={cn(
+        'block w-full text-left bg-brand-50/70 dark:bg-brand-950/30 border-l-[3px] border-brand-500 rounded-md px-2 py-1.5 hover:bg-brand-100/70 dark:hover:bg-brand-950/50 transition-colors',
+        isCompleted && 'opacity-50 hover:opacity-90',
+      )}
     >
-      <div className="text-[11px] font-semibold text-gray-900 dark:text-gray-100 leading-tight truncate">
+      <div className={cn(
+        'text-[11px] font-semibold text-gray-900 dark:text-gray-100 leading-tight truncate',
+        isCompleted && 'line-through',
+      )}>
         {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
       </div>
       {j.customer?.address && (
@@ -413,26 +438,34 @@ function InlineJobCard({ j, onClick }) {
   )
 }
 
-// ─── Mobile: single-day card list (unchanged shape from before) ──
+// ─── Mobile: single-day card list ──
+// Completed jobs render dimmed + line-through so the day's
+// remaining work stands out.
 function JobCard({ j, onClick }) {
+  const isCompleted = j.status === 'completed'
   return (
-    <Card onClick={onClick}>
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant={badgeFor(JOB_TYPES, j.job_type)}>{labelFor(JOB_TYPES, j.job_type)}</Badge>
-          </div>
-          <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-            {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
-          </p>
-          {j.customer?.address && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 inline-flex items-center gap-1">
-              <User className="w-3 h-3" />{j.customer.name}
+    <div className={cn(isCompleted && 'opacity-60')}>
+      <Card onClick={onClick}>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant={badgeFor(JOB_TYPES, j.job_type)}>{labelFor(JOB_TYPES, j.job_type)}</Badge>
+            </div>
+            <p className={cn(
+              'font-medium text-gray-900 dark:text-gray-100 truncate',
+              isCompleted && 'line-through',
+            )}>
+              {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
             </p>
-          )}
+            {j.customer?.address && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 inline-flex items-center gap-1">
+                <User className="w-3 h-3" />{j.customer.name}
+              </p>
+            )}
+          </div>
+          <Badge variant={badgeFor(JOB_STATUSES, j.status)} dot>{labelFor(JOB_STATUSES, j.status)}</Badge>
         </div>
-        <Badge variant={badgeFor(JOB_STATUSES, j.status)} dot>{labelFor(JOB_STATUSES, j.status)}</Badge>
-      </div>
-    </Card>
+      </Card>
+    </div>
   )
 }
