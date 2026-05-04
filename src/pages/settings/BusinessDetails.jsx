@@ -16,6 +16,10 @@ const EMPTY = {
   phone: '',
   address: '',
   gst_number: '',
+  // GST rate stored as a decimal (0.15 = 15%) but edited in the form
+  // as a percentage so the operator types "15" instead of "0.15".
+  // The save handler converts back to decimal before writing.
+  gst_rate_percent: 15,
   bank_account: '',
   quote_prefix: 'Q-',
   invoice_prefix: 'INV-',
@@ -39,6 +43,9 @@ export default function BusinessDetails() {
       phone: business.phone || '',
       address: business.address || '',
       gst_number: business.gst_number || '',
+      // Decimal → percent for editing. business.gst_rate may arrive as
+      // a string ("0.1500") from PostgREST numeric, so coerce.
+      gst_rate_percent: business.gst_rate != null ? Number(business.gst_rate) * 100 : 15,
       bank_account: business.bank_account || '',
       quote_prefix: business.quote_prefix || 'Q-',
       invoice_prefix: business.invoice_prefix || 'INV-',
@@ -56,7 +63,13 @@ export default function BusinessDetails() {
       const payload = {
         ...form,
         payment_terms_days: Number(form.payment_terms_days) || 14,
+        // Convert percent → decimal for storage. Clamp to [0, 1] in
+        // case the operator types something silly like 150 — don't want
+        // a 1.5 gst_rate slipping into invoices.
+        gst_rate: Math.max(0, Math.min(1, (Number(form.gst_rate_percent) || 15) / 100)),
       }
+      // Strip the UI-only percent field so it doesn't reach the row.
+      delete payload.gst_rate_percent
       const { error } = business?.id
         ? await supabase.from('businesses').update(payload).eq('id', business.id)
         : await supabase.from('businesses').insert(payload)
@@ -99,8 +112,9 @@ export default function BusinessDetails() {
 
             <div className="space-y-4">
               <h2 className="section-title">Tax & payment</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <Input label="GST number" value={form.gst_number} onChange={e => update('gst_number', e.target.value)} placeholder="123-456-789" />
+                <Input label="GST rate (%)" type="number" min="0" max="100" step="0.1" value={form.gst_rate_percent} onChange={e => update('gst_rate_percent', e.target.value)} placeholder="15" />
                 <Input label="Payment terms (days)" type="number" min="0" value={form.payment_terms_days} onChange={e => update('payment_terms_days', e.target.value)} />
               </div>
               <TextArea label="Bank account for direct credit" rows={2} value={form.bank_account} onChange={e => update('bank_account', e.target.value)} placeholder="Bank — 12-3456-7890123-00" />

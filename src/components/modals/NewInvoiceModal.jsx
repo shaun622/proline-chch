@@ -113,6 +113,10 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const filteredJobs = form.customer_id ? jobs.filter(j => j.customer_id === form.customer_id) : jobs
   const filteredQuotes = form.customer_id ? quotes.filter(q => q.customer_id === form.customer_id) : quotes
+  // Per-business GST rate (decimal). Falls back to the constant for
+  // legacy rows that predate Settings → Tax & payment → GST rate.
+  // numeric(5,4) arrives as a string from PostgREST so coerce.
+  const gstRate = business?.gst_rate != null ? Number(business.gst_rate) : GST_RATE
 
   async function copyFromQuote(quoteId) {
     if (!quoteId) return
@@ -135,7 +139,7 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
     if (form.lines.length === 0) return setErr('Add at least one line item')
     setErr(''); setSaving(true)
     try {
-      const totals = computeTotals(form.lines)
+      const totals = computeTotals(form.lines, gstRate)
       let number = editing?.number
       if (!isEditing) {
         const prefix = business?.invoice_prefix || 'INV-'
@@ -152,7 +156,7 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
         notes: form.notes.trim() || null,
         due_date: form.due_date || null,
         subtotal: totals.subtotal,
-        gst_rate: GST_RATE,
+        gst_rate: gstRate,
         gst_amount: totals.gst_amount,
         total: totals.total,
       }
@@ -200,7 +204,7 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
           <IconBox icon={Receipt} color="emerald" size="lg" />
           <div className="min-w-0">
             <p className="text-sm text-gray-700 dark:text-gray-300">{isEditing ? 'Update the invoice details' : 'Invoice number assigned on save'}</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">GST {Math.round(GST_RATE * 100)}% applied automatically.</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">GST {+(gstRate * 100).toFixed(2)}% applied automatically.</p>
           </div>
         </div>
 
@@ -241,7 +245,7 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Line items</label>
-          <LineItemsEditor lines={form.lines} onChange={lines => update('lines', lines)} />
+          <LineItemsEditor lines={form.lines} onChange={lines => update('lines', lines)} gstRate={gstRate} />
         </div>
 
         <TextArea label="Notes / payment info" rows={3} value={form.notes} onChange={e => update('notes', e.target.value)} placeholder="Bank account for direct credit, thanks, etc." />
