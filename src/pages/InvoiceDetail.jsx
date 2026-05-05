@@ -192,14 +192,22 @@ export default function InvoiceDetail() {
 
           <div className="space-y-2">
             <h2 className="section-title">Line items</h2>
-            {/* Pass the invoice's per-doc gst_rate so the GST line
-                hides for docs issued without GST (rate 0). Without
-                this, LineItemsEditor falls back to its 0.15 default
-                and shows "GST (15%)" on every invoice regardless. */}
+            {/* Derive the *issued* rate from the stored subtotal/total
+                instead of trusting invoice.gst_rate. The column is
+                nullable on legacy rows + on rows saved before 010,
+                and a null fallback to 0.15 caused LineItemsEditor to
+                recompute and show "GST (15%)" even on docs that were
+                actually issued at 0%. Total - subtotal is always the
+                source of truth — gst_rate is just metadata. */}
             <LineItemsEditor
               lines={lines.map(l => ({ ...l, id: l.id }))}
               readOnly
-              gstRate={invoice.gst_rate != null ? Number(invoice.gst_rate) : 0.15}
+              gstRate={(() => {
+                const sub = Number(invoice.subtotal) || 0
+                const tot = Number(invoice.total) || 0
+                if (sub <= 0) return invoice.gst_rate != null ? Number(invoice.gst_rate) : 0
+                return Math.max(0, (tot - sub) / sub)
+              })()}
             />
           </div>
 

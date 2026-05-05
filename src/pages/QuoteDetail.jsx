@@ -181,14 +181,19 @@ export default function QuoteDetail() {
 
           <div className="space-y-2">
             <h2 className="section-title">Line items</h2>
-            {/* Pass the quote's per-doc gst_rate so the GST line
-                hides for docs issued without GST (rate 0). Without
-                this, LineItemsEditor falls back to its 0.15 default
-                and shows "GST (15%)" on every quote regardless. */}
+            {/* Derive the *issued* rate from the stored subtotal/total
+                instead of trusting quote.gst_rate. See InvoiceDetail
+                for the full rationale — null gst_rate fallback to
+                0.15 was wrong for docs issued at 0%. */}
             <LineItemsEditor
               lines={lines.map(l => ({ ...l, id: l.id }))}
               readOnly
-              gstRate={quote.gst_rate != null ? Number(quote.gst_rate) : 0.15}
+              gstRate={(() => {
+                const sub = Number(quote.subtotal) || 0
+                const tot = Number(quote.total) || 0
+                if (sub <= 0) return quote.gst_rate != null ? Number(quote.gst_rate) : 0
+                return Math.max(0, (tot - sub) / sub)
+              })()}
             />
           </div>
 
