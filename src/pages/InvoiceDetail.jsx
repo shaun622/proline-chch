@@ -192,7 +192,15 @@ export default function InvoiceDetail() {
 
           <div className="space-y-2">
             <h2 className="section-title">Line items</h2>
-            <LineItemsEditor lines={lines.map(l => ({ ...l, id: l.id }))} readOnly />
+            {/* Pass the invoice's per-doc gst_rate so the GST line
+                hides for docs issued without GST (rate 0). Without
+                this, LineItemsEditor falls back to its 0.15 default
+                and shows "GST (15%)" on every invoice regardless. */}
+            <LineItemsEditor
+              lines={lines.map(l => ({ ...l, id: l.id }))}
+              readOnly
+              gstRate={invoice.gst_rate != null ? Number(invoice.gst_rate) : 0.15}
+            />
           </div>
 
           {invoice.notes && (

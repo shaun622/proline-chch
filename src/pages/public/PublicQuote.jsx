@@ -155,14 +155,21 @@ export default function PublicQuote() {
           </Card>
         )}
 
-        <footer className="text-center text-xs text-gray-500 dark:text-gray-400 pt-4 space-y-1">
-          <p className="inline-flex items-center gap-1 justify-center"><Building2 className="w-3 h-3" /> {business?.name || 'ProLine Aluminium'}</p>
+        {/* Contact card — promoted from a bare <footer> to a proper
+            Card so it reads as a sign-off rather than fine print.
+            GST number is only shown when the business is currently
+            GST-registered (gst_enabled); unregistered tradies don't
+            legally have a number to display. */}
+        <Card className="!p-5 text-center space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <p className="inline-flex items-center gap-1.5 justify-center font-semibold text-gray-700 dark:text-gray-300">
+            <Building2 className="w-3.5 h-3.5" /> {business?.name || 'ProLine Aluminium'}
+          </p>
           <p className="inline-flex items-center gap-3 justify-center flex-wrap">
             {business?.phone && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{business.phone}</span>}
             {business?.email && <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3" />{business.email}</span>}
           </p>
-          {business?.gst_number && <p>GST {business.gst_number}</p>}
-        </footer>
+          {business?.gst_enabled !== false && business?.gst_number && <p>GST {business.gst_number}</p>}
+        </Card>
       </div>
 
       <ConfirmModal

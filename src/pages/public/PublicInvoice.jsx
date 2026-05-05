@@ -151,18 +151,27 @@ export default function PublicInvoice() {
             <p className="text-sm whitespace-pre-wrap">{invoice.notes}</p>
           </Card>
         )}
-        {business?.invoice_footer && (
-          <Card><p className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap">{business.invoice_footer}</p></Card>
-        )}
-
-        <footer className="text-center text-xs text-gray-500 dark:text-gray-400 pt-4 space-y-1">
-          <p className="inline-flex items-center gap-1 justify-center"><Building2 className="w-3 h-3" /> {business?.name || 'ProLine Aluminium'}</p>
-          <p className="inline-flex items-center gap-3 justify-center flex-wrap">
-            {business?.phone && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{business.phone}</span>}
-            {business?.email && <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3" />{business.email}</span>}
-          </p>
-          {business?.gst_number && <p>GST {business.gst_number}</p>}
-        </footer>
+        {/* Thank-you + contact card. Combines what used to be a
+            footer-text Card and a separate <footer> contact line into
+            one centred block — easier to read and keeps the page
+            ending tidy. GST number is intentionally only shown when
+            the business is currently GST-registered (gst_enabled);
+            unregistered tradies don't legally have a number to show. */}
+        <Card className="!p-5 text-center space-y-3">
+          {business?.invoice_footer && (
+            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{business.invoice_footer}</p>
+          )}
+          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <p className="inline-flex items-center gap-1.5 justify-center font-semibold text-gray-700 dark:text-gray-300">
+              <Building2 className="w-3.5 h-3.5" /> {business?.name || 'ProLine Aluminium'}
+            </p>
+            <p className="inline-flex items-center gap-3 justify-center flex-wrap">
+              {business?.phone && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{business.phone}</span>}
+              {business?.email && <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3" />{business.email}</span>}
+            </p>
+            {business?.gst_enabled !== false && business?.gst_number && <p>GST {business.gst_number}</p>}
+          </div>
+        </Card>
       </div>
     </div>
   )
