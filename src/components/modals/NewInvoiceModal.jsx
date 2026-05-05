@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Receipt, UserPlus } from 'lucide-react'
+import { Mail, MapPin, Phone, Receipt, User, UserPlus } from 'lucide-react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import IconBox from '../ui/IconBox'
@@ -57,7 +57,9 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
 
   const loadRefs = useCallback(async () => {
     const [{ data: cs }, { data: js }, { data: qs }, { data: biz }] = await Promise.all([
-      supabase.from('customers').select('id, name').order('name'),
+      // Pull contact details too so the Bill-to summary below the
+      // picker renders without a second round-trip.
+      supabase.from('customers').select('id, name, phone, email, address, suburb').order('name'),
       supabase.from('jobs').select('id, title, customer_id').order('created_at', { ascending: false }).limit(100),
       supabase.from('quotes').select('id, number, title, customer_id, total').order('created_at', { ascending: false }).limit(100),
       supabase.from('businesses').select('*').limit(1).maybeSingle(),
@@ -224,6 +226,46 @@ export default function NewInvoiceModal({ open, onClose, onSaved, editing = null
             <Button variant="secondary" size="md" onClick={() => setNewCustomerOpen(true)} leftIcon={UserPlus}>New</Button>
           </div>
         </div>
+
+        {/* Bill to — details for the picked customer so the operator
+            can sanity-check the invoice is going to the right person.
+            Address combines address + suburb (Christchurch suburbs
+            are first-class on the customer record). Missing fields
+            render as a grey em-dash for stable card height. */}
+        {(() => {
+          const sc = customers.find(c => c.id === form.customer_id)
+          if (!sc) return null
+          const address = [sc.address, sc.suburb].filter(Boolean).join(', ')
+          return (
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-800 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2.5">Bill to</p>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex items-start gap-2.5">
+                  <User className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 mt-0.5" strokeWidth={2} />
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">{sc.name}</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 mt-0.5" strokeWidth={2} />
+                  {sc.phone
+                    ? <span className="text-gray-700 dark:text-gray-300">{sc.phone}</span>
+                    : <span className="text-gray-400 dark:text-gray-500">—</span>}
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 mt-0.5" strokeWidth={2} />
+                  {sc.email
+                    ? <span className="text-gray-700 dark:text-gray-300 break-all">{sc.email}</span>
+                    : <span className="text-gray-400 dark:text-gray-500">—</span>}
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 mt-0.5" strokeWidth={2} />
+                  {address
+                    ? <span className="text-gray-700 dark:text-gray-300">{address}</span>
+                    : <span className="text-gray-400 dark:text-gray-500">—</span>}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {!isEditing && filteredQuotes.length > 0 && (
           <div className="space-y-1.5">
