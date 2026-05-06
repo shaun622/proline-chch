@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Calendar, Wrench, Users, MoreHorizontal, FileText, Receipt, Settings as SettingsIcon, LogOut } from 'lucide-react'
+import { Home, Calendar, Wrench, Users, MoreHorizontal, FileText, Receipt, Wallet, Settings as SettingsIcon, LogOut } from 'lucide-react'
 import MoreSheet from './MoreSheet'
 import { cn } from '../../lib/utils'
 
@@ -14,6 +14,7 @@ const PRIMARY = [
 const MORE_ITEMS = [
   { path: '/quotes',   label: 'Quotes',   Icon: FileText, color: 'indigo', description: 'Estimates & proposals' },
   { path: '/invoices', label: 'Invoices', Icon: Receipt,  color: 'emerald', description: 'Send & track payments' },
+  { path: '/expenses', label: 'Expenses', Icon: Wallet,   color: 'amber',   description: 'Money in / money out' },
   { path: '/settings', label: 'Settings', Icon: SettingsIcon, color: 'gray', description: 'Business details & preferences' },
 ]
 

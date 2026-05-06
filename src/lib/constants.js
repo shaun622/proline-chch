@@ -41,6 +41,23 @@ export const INVOICE_STATUSES = [
   { value: 'overdue', label: 'Overdue', badge: 'danger' },
 ]
 
+export const EXPENSE_TYPES = [
+  { value: 'expense', label: 'Expense', badge: 'danger',  color: 'red' },
+  { value: 'income',  label: 'Income',  badge: 'success', color: 'emerald' },
+]
+
+// Surfaced as <datalist> options in NewExpenseModal so common picks
+// are one-click. Free text — the operator can type anything not on
+// the list and it'll save fine.
+export const EXPENSE_CATEGORY_SUGGESTIONS = [
+  'Materials', 'Fuel', 'Vehicle', 'Tools',
+  'Subcontractors', 'Phone & internet', 'Insurance',
+  'Accounting', 'Bank fees', 'Other',
+]
+export const INCOME_CATEGORY_SUGGESTIONS = [
+  'Job payment', 'Refund', 'Other',
+]
+
 export function labelFor(list, value) {
   return list.find(x => x.value === value)?.label ?? value
 }

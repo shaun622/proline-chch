@@ -14,6 +14,7 @@ import Quotes from './pages/Quotes'
 import QuoteDetail from './pages/QuoteDetail'
 import Invoices from './pages/Invoices'
 import InvoiceDetail from './pages/InvoiceDetail'
+import Expenses from './pages/Expenses'
 import Settings from './pages/Settings'
 import BusinessDetails from './pages/settings/BusinessDetails'
 import PublicQuote from './pages/public/PublicQuote'
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/quotes/:id" element={<QuoteDetail />} />
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/invoices/:id" element={<InvoiceDetail />} />
+        <Route path="/expenses" element={<Expenses />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/business" element={<BusinessDetails />} />
       </Route>

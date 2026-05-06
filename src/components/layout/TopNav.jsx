@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Calendar, Wrench, Users, FileText, Receipt, Settings as SettingsIcon } from 'lucide-react'
+import { Home, Calendar, Wrench, Users, FileText, Receipt, Wallet, Settings as SettingsIcon } from 'lucide-react'
 import { ThemeToggleCompact } from './ThemeToggle'
 import GlobalSearch from './GlobalSearch'
 import { cn } from '../../lib/utils'
@@ -11,6 +11,7 @@ const TABS = [
   { path: '/customers', label: 'Customers', Icon: Users },
   { path: '/quotes',    label: 'Quotes',    Icon: FileText },
   { path: '/invoices',  label: 'Invoices',  Icon: Receipt },
+  { path: '/expenses',  label: 'Expenses',  Icon: Wallet },
 ]
 
 export default function TopNav() {
