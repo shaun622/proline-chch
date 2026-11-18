@@ -91,6 +91,20 @@ export async function sendResendEmail({ env, to, subject, html, replyTo }) {
   return res.json()
 }
 
+function renderPortalLink(portalUrl, label) {
+  const url = escapeAttr(portalUrl)
+  // Email clients may drop gradients. Keep a solid background on both
+  // the table cell and link, plus a readable URL if button styling is removed.
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+    <tr><td align="center" bgcolor="#3F4650" style="background-color:#3F4650;border-radius:10px;">
+      <a href="${url}" style="display:inline-block;background-color:#3F4650;border:1px solid #3F4650;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;line-height:20px;"><span style="color:#ffffff;">${escapeHtml(label)}</span></a>
+    </td></tr>
+  </table>
+  <p style="margin:0 0 24px;font-size:13px;line-height:1.55;color:#374151;">If the button doesn't work, open this link:<br>
+    <a href="${url}" style="color:#1d4ed8;text-decoration:underline;word-break:break-all;">${escapeHtml(portalUrl)}</a>
+  </p>`
+}
+
 export function renderQuoteEmail({ quote, business, customer, portalUrl }) {
   const name = customer?.name?.split(' ')[0] || 'there'
   const brand = business?.name || 'ProLine Aluminium'
@@ -112,9 +126,7 @@ export function renderQuoteEmail({ quote, business, customer, portalUrl }) {
           <p style="margin:0 0 12px;font-size:15px;line-height:1.55;">Hi ${escapeHtml(name)},</p>
           <p style="margin:0 0 12px;font-size:15px;line-height:1.55;">Thanks for the chance to quote${quote.title ? ` on <strong>${escapeHtml(quote.title)}</strong>` : ''}. The full breakdown is on the link below.</p>
           <p style="margin:0 0 20px;font-size:15px;"><strong style="font-size:18px;">${total}</strong>${gstCaption ? ` <span style="color:#6b7280;font-size:13px;">${gstCaption}</span>` : ''}</p>
-          <p style="margin:0 0 24px;">
-            <a href="${escapeAttr(portalUrl)}" style="display:inline-block;background:linear-gradient(135deg,#5E6875 0%,#3F4650 100%);color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">View &amp; accept quote →</a>
-          </p>
+          ${renderPortalLink(portalUrl, 'View & accept quote →')}
           ${validUntil ? `<p style="margin:0 0 16px;font-size:13px;color:#6b7280;">Valid until ${escapeHtml(validUntil)}.</p>` : ''}
           <p style="margin:0 0 0;font-size:14px;line-height:1.55;color:#374151;">Any questions, hit reply or give us a call.</p>
         </td></tr>
@@ -148,9 +160,7 @@ export function renderInvoiceEmail({ invoice, business, customer, portalUrl }) {
           <p style="margin:0 0 12px;font-size:15px;line-height:1.55;">Your invoice${invoice.title ? ` for <strong>${escapeHtml(invoice.title)}</strong>` : ''} is ready.</p>
           <p style="margin:0 0 6px;font-size:15px;"><strong style="font-size:18px;">${total}</strong>${gstCaption ? ` <span style="color:#6b7280;font-size:13px;">${gstCaption}</span>` : ''}</p>
           ${due ? `<p style="margin:0 0 20px;font-size:13px;color:#6b7280;">Due ${escapeHtml(due)}.</p>` : ''}
-          <p style="margin:0 0 24px;">
-            <a href="${escapeAttr(portalUrl)}" style="display:inline-block;background:linear-gradient(135deg,#5E6875 0%,#3F4650 100%);color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">View invoice →</a>
-          </p>
+          ${renderPortalLink(portalUrl, 'View invoice →')}
           ${invoice.notes
             // New invoices have the notes pre-filled from Settings
             // (bank account + payment terms + GST). Render that as
