@@ -7,6 +7,7 @@ import Badge from '../ui/Badge'
 import NewInvoiceModal from './NewInvoiceModal'
 import { supabase } from '../../lib/supabase'
 import { badgeFor, labelFor, JOB_STATUSES, JOB_TYPES } from '../../lib/constants'
+import { formatJobSchedule } from '../../lib/jobSchedule'
 
 /**
  * Quick-action modal for a Schedule job click.
@@ -104,7 +105,7 @@ export default function JobQuickModal({ open, onClose, job, onUpdated }) {
               <Row
                 icon={<Clock className="w-4 h-4" />}
                 label="Scheduled"
-                value={new Date(job.scheduled_date).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+                value={formatJobSchedule(job)}
               />
             )}
           </div>

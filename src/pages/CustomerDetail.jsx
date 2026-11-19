@@ -13,6 +13,7 @@ import NewCustomerModal from '../components/modals/NewCustomerModal'
 import { supabase } from '../lib/supabase'
 import { badgeFor, JOB_STATUSES, JOB_TYPES, labelFor, PROPERTY_TYPES } from '../lib/constants'
 import { currency, formatDate, initials } from '../lib/utils'
+import { formatJobSchedule } from '../lib/jobSchedule'
 
 export default function CustomerDetail() {
   const { id } = useParams()
@@ -142,7 +143,7 @@ export default function CustomerDetail() {
                         <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{j.title}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                           {labelFor(JOB_TYPES, j.job_type)}
-                          {j.scheduled_date ? ` · ${formatDate(j.scheduled_date)}` : ''}
+                          {j.scheduled_date ? ` · ${formatJobSchedule(j)}` : ''}
                         </p>
                       </div>
                       <Badge variant={badgeFor(JOB_STATUSES, j.status)}>{labelFor(JOB_STATUSES, j.status)}</Badge>

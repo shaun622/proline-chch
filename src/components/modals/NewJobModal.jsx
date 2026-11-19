@@ -8,6 +8,7 @@ import NewCustomerModal from './NewCustomerModal'
 import { supabase } from '../../lib/supabase'
 import { JOB_KINDS, JOB_STATUSES, JOB_TYPES } from '../../lib/constants'
 import { cn } from '../../lib/utils'
+import { jobDay } from '../../lib/jobSchedule'
 
 const EMPTY = {
   customer_id: '',
@@ -17,6 +18,7 @@ const EMPTY = {
   job_type: 'maintenance',
   status: 'scheduled',
   scheduled_date: '',
+  scheduled_time: '',
   address: '',
   notes: '',
 }
@@ -30,7 +32,8 @@ function fromRecord(row) {
     job_kind: row.job_kind ?? 'repair',
     job_type: row.job_type ?? 'maintenance',
     status: row.status ?? 'scheduled',
-    scheduled_date: row.scheduled_date ? new Date(row.scheduled_date).toISOString().slice(0, 10) : '',
+    scheduled_date: row.scheduled_date ? jobDay(row.scheduled_date) : '',
+    scheduled_time: row.scheduled_time?.slice(0, 5) ?? '',
     address: row.address ?? '',
     notes: row.notes ?? '',
   }
@@ -64,6 +67,9 @@ export default function NewJobModal({ open, onClose, onSaved, editing = null, pr
     if (!form.title.trim()) return setErr('Title is required')
     setErr(''); setSaving(true)
     try {
+      const existingDay = editing?.scheduled_date ? jobDay(editing.scheduled_date) : ''
+      const dateChanged = form.scheduled_date !== existingDay
+      const timeChanged = form.scheduled_time !== (editing?.scheduled_time?.slice(0, 5) || '')
       const payload = {
         customer_id: form.customer_id,
         title: form.title.trim(),
@@ -71,15 +77,25 @@ export default function NewJobModal({ open, onClose, onSaved, editing = null, pr
         job_kind: form.job_kind,
         job_type: form.job_type,
         status: form.status,
-        scheduled_date: form.scheduled_date ? new Date(form.scheduled_date + 'T09:00').toISOString() : null,
+        ...(dateChanged && {
+          scheduled_date: form.scheduled_date ? `${form.scheduled_date}T00:00:00.000Z` : null,
+          schedule_order: null,
+        }),
+        ...((dateChanged || timeChanged) && { scheduled_time: form.scheduled_date ? form.scheduled_time || null : null }),
         address: form.address.trim() || null,
         notes: form.notes.trim() || null,
       }
-      const q = isEditing
-        ? supabase.from('jobs').update(payload).eq('id', editing.id).select().single()
-        : supabase.from('jobs').insert(payload).select().single()
-      const { data, error } = await q
+      let query = isEditing
+        ? supabase.from('jobs').update(payload).eq('id', editing.id)
+        : supabase.from('jobs').insert(payload)
+      if (isEditing && (dateChanged || timeChanged)) {
+        query = editing.scheduled_date
+          ? query.eq('scheduled_date', editing.scheduled_date)
+          : query.is('scheduled_date', null)
+      }
+      const { data, error } = await query.select().maybeSingle()
       if (error) throw error
+      if (!data) throw new Error('This job was changed elsewhere. Refresh and try again.')
       onSaved?.(data)
       onClose?.()
     } catch (e) {
@@ -160,12 +176,17 @@ export default function NewJobModal({ open, onClose, onSaved, editing = null, pr
           <Select label="Status" options={JOB_STATUSES} value={form.status} onChange={e => update('status', e.target.value)} />
         </div>
 
-        <Input
-          label="Scheduled date"
-          type="date"
-          value={form.scheduled_date}
-          onChange={e => update('scheduled_date', e.target.value)}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input label="Scheduled date" aria-label="Scheduled date" type="date"
+            value={form.scheduled_date} onChange={e => setForm(f => ({
+              ...f,
+              scheduled_date: e.target.value,
+              scheduled_time: e.target.value ? f.scheduled_time : '',
+            }))} />
+          <Input label="Start time (optional)" aria-label="Start time" type="time"
+            value={form.scheduled_time} onChange={e => update('scheduled_time', e.target.value)}
+            disabled={!form.scheduled_date} hint="Christchurch time" />
+        </div>
 
         <Input
           label="Address override"

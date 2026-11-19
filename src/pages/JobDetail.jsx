@@ -14,6 +14,7 @@ import { Select } from '../components/ui/Input'
 import { supabase } from '../lib/supabase'
 import { badgeFor, JOB_KINDS, JOB_STATUSES, JOB_TYPES, labelFor } from '../lib/constants'
 import { formatDate } from '../lib/utils'
+import { formatJobSchedule } from '../lib/jobSchedule'
 
 export default function JobDetail() {
   const { id } = useParams()
@@ -100,7 +101,7 @@ export default function JobDetail() {
             <DetailRow icon={User} color="brand" label="Customer" value={job.customer?.name}
               action={<button className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline" onClick={() => nav(`/customers/${job.customer?.id}`)}>View</button>}
             />
-            <DetailRow icon={Calendar} color="emerald" label="Scheduled" value={job.scheduled_date ? formatDate(job.scheduled_date) : 'Not scheduled'} />
+            <DetailRow icon={Calendar} color="emerald" label="Scheduled" value={formatJobSchedule(job)} />
             <DetailRow icon={MapPin} color="amber" label="Site address" value={siteAddress || '—'} />
             {job.completed_date && (
               <DetailRow icon={CircleCheckBig} color="emerald" label="Completed" value={formatDate(job.completed_date)} />

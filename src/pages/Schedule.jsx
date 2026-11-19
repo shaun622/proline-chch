@@ -1,471 +1,353 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Calendar, Plus, User, ChevronLeft, ChevronRight, CalendarClock } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowDownUp, ArrowUp, Calendar, CalendarClock, ChevronLeft, ChevronRight, Clock, Plus } from 'lucide-react'
 import PageWrapper from '../components/layout/PageWrapper'
 import PageHero from '../components/layout/PageHero'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
+import { Input } from '../components/ui/Input'
+import Modal from '../components/ui/Modal'
 import NewJobModal from '../components/modals/NewJobModal'
 import JobQuickModal from '../components/modals/JobQuickModal'
 import { supabase } from '../lib/supabase'
 import { badgeFor, JOB_STATUSES, JOB_TYPES, labelFor } from '../lib/constants'
+import { addCalendarDays, compareScheduledJobs, formatCalendarDay, formatJobTime, jobDay, jobDayStart } from '../lib/jobSchedule'
 import { cn } from '../lib/utils'
 
-// Up to this many stops render inline per day column. Past that, the
-// remainder collapse behind a "+N more" link that flips the bottom
-// section to that day. Keeps the week-grid row a manageable height
-// no matter how busy a single day gets.
-const MAX_VISIBLE_STOPS_PER_DAY = 8
-
-function startOfWeek(d = new Date()) {
-  const x = new Date(d)
-  const day = x.getDay() // 0 = Sun
-  const diff = (day + 6) % 7 // days since Monday
-  x.setDate(x.getDate() - diff)
-  x.setHours(0, 0, 0, 0)
-  return x
-}
-
-function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x }
-
-function sameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
-
-function ymd(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const MAX_VISIBLE_STOPS = 8
+const JOB_SELECT = '*, customer:customer_id(id,name,address,suburb,phone,email,property_type)'
+const pagerClass = 'inline-flex items-center justify-center gap-1 min-h-tap px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50'
+const dayLabel = day => formatCalendarDay(day, { weekday: 'long', day: 'numeric', month: 'short' })
+const dayIndex = day => (new Date(day).getUTCDay() + 6) % 7
+const startOfWeek = day => addCalendarDays(day, -dayIndex(day))
+const jobTitle = job => job.customer?.name ? `${job.customer.name} · ${job.title}` : job.title
+const jobAddress = job => job.address || [job.customer?.address, job.customer?.suburb].filter(Boolean).join(', ')
+const timeLabel = job => formatJobTime(job.scheduled_time) || 'No time set'
 
 export default function Schedule() {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek())
-  // Mobile single-day view index (0 = Mon, 6 = Sun).
-  const [dayIdx, setDayIdx] = useState(() => {
-    const today = new Date()
-    const idx = Math.round((today - startOfWeek()) / (1000 * 60 * 60 * 24))
-    return idx >= 0 && idx < 7 ? idx : 0
-  })
+  const today = jobDay()
+  const [week, setWeek] = useState(() => startOfWeek(today))
+  const [mobileIndex, setMobileIndex] = useState(() => dayIndex(today))
+  const [focusedDay, setFocusedDay] = useState(null)
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [newJobOpen, setNewJobOpen] = useState(false)
-  // Job whose quick-action modal is open. null when no modal is showing.
+  const [loadError, setLoadError] = useState('')
+  const [reload, setReload] = useState(0)
+  const [newJobDay, setNewJobDay] = useState(null)
   const [openJob, setOpenJob] = useState(null)
-  // The desktop week grid caps each day at MAX_VISIBLE_STOPS_PER_DAY rows.
-  // Clicking the day header (or "+N more") flips the bottom "Today"
-  // section into a "selected day" section showing every stop that day,
-  // no cap. null = bottom section shows real today.
-  const [focusedDay, setFocusedDay] = useState(null)
+  const [timeJob, setTimeJob] = useState(null)
+  const [reorder, setReorder] = useState(null)
 
-  const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart])
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addCalendarDays(week, i)), [week])
+  const thisWeek = week === startOfWeek(today)
+  const selectedDay = focusedDay || (thisWeek ? today : week)
+  const mobileDay = days[mobileIndex]
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    let active = true
     setLoading(true)
-    const { data } = await supabase
-      .from('jobs')
-      .select('*, customer:customer_id(id,name,address,suburb,phone,email,property_type)')
-      .gte('scheduled_date', weekStart.toISOString())
-      .lt('scheduled_date', weekEnd.toISOString())
-      .order('scheduled_date')
-    setJobs(data || [])
-    setLoading(false)
-  }, [weekStart, weekEnd])
+    setLoadError('')
+    void (async () => {
+      const { data, error } = await supabase.from('jobs').select(JOB_SELECT)
+        .gte('scheduled_date', jobDayStart(week))
+        .lt('scheduled_date', jobDayStart(addCalendarDays(week, 7)))
+      if (!active) return
+      setJobs(data || [])
+      setLoadError(error ? 'Could not load the schedule.' : '')
+      setLoading(false)
+    })()
+    return () => { active = false }
+  }, [week, reload])
 
-  useEffect(() => { load() }, [load])
-
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
   const byDay = useMemo(() => {
-    const map = new Map()
-    for (const d of days) map.set(ymd(d), [])
-    for (const j of jobs) {
-      const d = new Date(j.scheduled_date)
-      const key = ymd(d)
-      if (map.has(key)) map.get(key).push(j)
-    }
+    const map = new Map(days.map(day => [day, []]))
+    for (const job of jobs) map.get(jobDay(job.scheduled_date))?.push(job)
+    for (const list of map.values()) list.sort(compareScheduledJobs)
     return map
-  }, [jobs, days])
+  }, [days, jobs])
 
-  const today = new Date()
-  const todayMid = useMemo(() => { const t = new Date(today); t.setHours(0,0,0,0); return t }, [today])
-  const isThisWeek = sameDay(startOfWeek(today), weekStart)
-
-  // Day-step (mobile single-day view): when stepping past the ends of
-  // the current week, jump to the adjacent week so the user can keep
-  // swiping forward / back without manually changing weeks.
-  const stepDay = (delta) => {
-    const next = dayIdx + delta
-    if (next < 0) { setWeekStart(addDays(weekStart, -7)); setDayIdx(6) }
-    else if (next > 6) { setWeekStart(addDays(weekStart, 7)); setDayIdx(0) }
-    else { setDayIdx(next) }
+  function refresh() {
+    setReload(value => value + 1)
   }
 
-  const headerLabel = useMemo(() => {
-    const s = weekStart.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })
-    const e = addDays(weekStart, 6).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-    return `${s} — ${e}`
-  }, [weekStart])
+  function changeWeek(day) {
+    setWeek(day)
+    setFocusedDay(null)
+  }
 
-  const focusedDay_mobile = days[dayIdx]
-  const focusedJobs_mobile = byDay.get(ymd(focusedDay_mobile)) || []
+  function stepDay(delta) {
+    const index = mobileIndex + delta
+    if (index < 0 || index > 6) changeWeek(addCalendarDays(week, delta * 7))
+    setMobileIndex((index + 7) % 7)
+  }
 
-  // Bottom-section "selected day". Defaults to today when in this week,
-  // else the start of the visible week (so it always has a coherent
-  // anchor regardless of week navigation).
-  const selectedDay = focusedDay || (isThisWeek ? today : weekStart)
-  const selectedDayJobs = byDay.get(ymd(selectedDay)) || []
-  const isFocusedReal = focusedDay && !sameDay(focusedDay, today)
-  const selectedDayHeading = isFocusedReal
-    ? selectedDay.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short' })
-    : 'Today'
-
-  // Scroll the bottom section into view when the operator clicks a
-  // day header — on a tall page they might not notice it updating
-  // below the fold otherwise.
   function focusDay(day) {
     setFocusedDay(day)
-    requestAnimationFrame(() => {
-      document.getElementById('schedule-day-section')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
+    requestAnimationFrame(() => document.getElementById('schedule-day-section')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  function dayJobs(day) {
+    const list = byDay.get(day)
+    return <DayJobs day={day} today={today} jobs={list} onOpen={setOpenJob} onSetTime={setTimeJob}
+      onReorder={() => setReorder({ day, jobs: list })} />
   }
 
   return (
     <PageWrapper width="wide">
-      <PageHero
-        title="Schedule"
-        subtitle={loading ? 'Loading…' : `${jobs.length} job${jobs.length === 1 ? '' : 's'} this week`}
-        action={<Button leftIcon={Plus} onClick={() => setNewJobOpen(true)}>New Job</Button>}
-      />
+      <PageHero title="Schedule"
+        subtitle={loading ? 'Loading…' : loadError ? 'Schedule unavailable' : `${jobs.length} job${jobs.length === 1 ? '' : 's'} this week`}
+        action={<>
+          <Button leftIcon={Plus} className="hidden md:inline-flex" onClick={() => setNewJobDay(selectedDay)}>New Job</Button>
+          <Button leftIcon={Plus} className="md:hidden" onClick={() => setNewJobDay(mobileDay)}>New Job</Button>
+        </>} />
 
-      {/* Mobile: single-day view with day-step arrows. */}
       <div className="md:hidden flex items-center gap-2 mb-4">
-        <button onClick={() => stepDay(-1)} aria-label="Previous day"
-          className="min-h-tap min-w-tap flex items-center justify-center rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-          <ChevronLeft className="w-4 h-4" />
-        </button>
+        <button type="button" onClick={() => stepDay(-1)} aria-label="Previous day" className={pagerClass}><ChevronLeft className="w-4 h-4" /></button>
         <div className="flex-1 text-center">
-          <p className={'text-sm font-semibold ' + (sameDay(focusedDay_mobile, today) ? 'text-brand-700 dark:text-brand-300' : 'text-gray-700 dark:text-gray-300')}>
-            {sameDay(focusedDay_mobile, today)
-              ? 'Today'
-              : focusedDay_mobile.toLocaleDateString('en-NZ', { weekday: 'long' })}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-            {focusedDay_mobile.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </p>
-          {!sameDay(focusedDay_mobile, today) && (
-            <button onClick={() => { setWeekStart(startOfWeek()); setDayIdx(Math.round((today - startOfWeek()) / (1000 * 60 * 60 * 24))) }}
-              className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline">
-              Jump to today
-            </button>
+          <p className="text-sm font-semibold">{mobileDay === today ? 'Today' : formatCalendarDay(mobileDay, { weekday: 'long' })}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{formatCalendarDay(mobileDay, { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          {mobileDay !== today && (
+            <button type="button" onClick={() => { changeWeek(startOfWeek(today)); setMobileIndex(dayIndex(today)) }}
+              className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline">Jump to today</button>
           )}
         </div>
-        <button onClick={() => stepDay(1)} aria-label="Next day"
-          className="min-h-tap min-w-tap flex items-center justify-center rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        <button type="button" onClick={() => stepDay(1)} aria-label="Next day" className={pagerClass}><ChevronRight className="w-4 h-4" /></button>
       </div>
-
-      {/* Desktop: week range + Prev / This week / Next nav. Matches the
-          PoolPro Schedule layout the operator referenced. */}
       <div className="hidden md:flex items-center justify-between gap-3 mb-4">
-        <div className="min-w-0">
+        <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-400 inline-flex items-center gap-2">
-            <CalendarClock className="w-3.5 h-3.5" strokeWidth={2.5} />
-            Week view
+            <CalendarClock className="w-3.5 h-3.5" /> Week view
           </p>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{headerLabel}</h1>
+          <h2 className="text-2xl font-bold mt-1">
+            {formatCalendarDay(week, { weekday: 'short', day: 'numeric', month: 'short' })} — {formatCalendarDay(days[6], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+          </h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => setWeekStart(addDays(weekStart, -7))}
-            className="inline-flex items-center gap-1 h-9 px-3 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-            <ChevronLeft className="w-4 h-4" /> Prev
-          </button>
-          <button onClick={() => setWeekStart(startOfWeek())} disabled={isThisWeek}
-            className={cn(
-              'h-9 px-3 rounded-full border text-sm font-medium transition-colors',
-              isThisWeek
-                ? 'bg-brand-50 dark:bg-brand-950/40 border-brand-200/70 dark:border-brand-800/40 text-brand-700 dark:text-brand-300'
-                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
-            )}>
-            This week
-          </button>
-          <button onClick={() => setWeekStart(addDays(weekStart, 7))}
-            className="inline-flex items-center gap-1 h-9 px-3 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-            Next <ChevronRight className="w-4 h-4" />
-          </button>
+        <div className="flex gap-2 shrink-0">
+          <button type="button" onClick={() => changeWeek(addCalendarDays(week, -7))} className={pagerClass}><ChevronLeft className="w-4 h-4" /> Prev</button>
+          <button type="button" onClick={() => changeWeek(startOfWeek(today))} disabled={thisWeek} className={pagerClass}>This week</button>
+          <button type="button" onClick={() => changeWeek(addCalendarDays(week, 7))} className={pagerClass}>Next <ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
 
-      {loading ? null : (
+      {loadError ? (
+        <Card className="flex items-center justify-between gap-3">
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
+          <Button size="sm" variant="secondary" onClick={refresh}>Retry</Button>
+        </Card>
+      ) : !loading && (
         <>
-          {/* Mobile: render only the focused day. */}
-          <div className="md:hidden">
-            {focusedJobs_mobile.length === 0 ? (
-              <Card>
-                <EmptyState icon={Calendar} title="No jobs this day" description="Nothing scheduled. Tap an arrow to step to the next day." />
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {focusedJobs_mobile.map(j => <JobCard key={j.id} j={j} onClick={() => setOpenJob(j)} />)}
-              </div>
-            )}
-          </div>
-
-          {/* Desktop: 7-column week grid. */}
+          <div className="md:hidden">{dayJobs(mobileDay)}</div>
           <div className="hidden md:block">
-            <WeekGrid
-              days={days}
-              byDay={byDay}
-              today={todayMid}
-              selectedDay={selectedDay}
-              onJobClick={(j) => setOpenJob(j)}
-              onFocusDay={focusDay}
-            />
-          </div>
-
-          {/* Selected-day section (desktop only). Mobile already lists
-              the focused day inline above so this is desktop-only. */}
-          <div className="hidden md:block mt-4" id="schedule-day-section">
-            <Card className="p-0 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400 inline-flex items-center gap-2">
-                  <CalendarClock className="w-3.5 h-3.5" strokeWidth={2.5} />
-                  {selectedDayHeading}
-                </p>
-                <div className="flex items-center gap-2">
-                  {isFocusedReal && (
-                    <button
-                      type="button"
-                      onClick={() => setFocusedDay(null)}
-                      className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline"
-                    >
-                      Back to today
-                    </button>
-                  )}
-                  <span className="inline-flex items-center justify-center min-w-[24px] px-2 h-6 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold tabular-nums text-gray-700 dark:text-gray-300">
-                    {selectedDayJobs.length}
-                  </span>
-                </div>
-              </div>
-              {selectedDayJobs.length === 0 ? (
-                <div className="px-4 py-12 text-center">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {isFocusedReal
-                      ? `Nothing scheduled for ${selectedDay.toLocaleDateString('en-NZ', { weekday: 'long' })}.`
-                      : 'Nothing scheduled.'}
-                  </p>
-                </div>
-              ) : (
-                <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {selectedDayJobs.map(j => {
-                    const isCompleted = j.status === 'completed'
-                    return (
-                      <li key={j.id}>
-                        <button
-                          onClick={() => setOpenJob(j)}
-                          className={cn(
-                            'w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors',
-                            isCompleted && 'opacity-60 hover:opacity-100',
-                          )}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <Badge variant={badgeFor(JOB_TYPES, j.job_type)}>{labelFor(JOB_TYPES, j.job_type)}</Badge>
-                              </div>
-                              <p className={cn(
-                                'font-medium text-gray-900 dark:text-gray-100 truncate',
-                                isCompleted && 'line-through',
-                              )}>
-                                {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
-                              </p>
-                              {j.customer?.address && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                                  {[j.customer.address, j.customer.suburb].filter(Boolean).join(', ')}
-                                </p>
-                              )}
-                            </div>
-                            <Badge variant={badgeFor(JOB_STATUSES, j.status)} dot>{labelFor(JOB_STATUSES, j.status)}</Badge>
-                          </div>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </Card>
+            <WeekGrid days={days} byDay={byDay} today={today} selectedDay={selectedDay} onFocusDay={focusDay} onJobClick={setOpenJob} />
+            <div className="mt-4 scroll-mt-32" id="schedule-day-section">{dayJobs(selectedDay)}</div>
           </div>
         </>
       )}
 
-      <NewJobModal open={newJobOpen} onClose={() => setNewJobOpen(false)} onSaved={(row) => { load(); setOpenJob(row) }} />
-      <JobQuickModal
-        open={!!openJob}
-        job={openJob}
-        onClose={() => setOpenJob(null)}
-        onUpdated={() => { load(); setOpenJob(null) }}
-      />
+      <NewJobModal open={!!newJobDay} prefill={{ scheduled_date: newJobDay }} onClose={() => setNewJobDay(null)}
+        onSaved={job => { refresh(); setOpenJob(job) }} />
+      <JobQuickModal open={!!openJob} job={openJob} onClose={() => setOpenJob(null)}
+        onUpdated={() => { refresh(); setOpenJob(null) }} />
+      {timeJob && <JobTimeModal job={timeJob} onClose={() => setTimeJob(null)} onSaved={updated => {
+        setJobs(current => current.map(job => job.id === updated.id ? updated : job))
+        setTimeJob(null)
+      }} />}
+      {reorder && <ReorderModal day={reorder.day} jobs={reorder.jobs} onClose={() => setReorder(null)}
+        onSaved={() => { setReorder(null); refresh() }} onStale={refresh} />}
     </PageWrapper>
   )
 }
 
-// ─── Week grid (7 day columns) ─────────────────
 function WeekGrid({ days, byDay, today, selectedDay, onJobClick, onFocusDay }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-card border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="grid grid-cols-7 divide-x divide-gray-100 dark:divide-gray-800">
-        {days.map(day => {
-          const list = byDay.get(ymd(day)) || []
-          const isToday = sameDay(day, today)
-          const isSelected = selectedDay && sameDay(day, selectedDay)
-          return (
-            <DayColumn
-              key={ymd(day)}
-              day={day}
-              jobs={list}
-              isToday={isToday}
-              isSelected={isSelected}
-              onJobClick={onJobClick}
-              onFocusDay={onFocusDay}
-            />
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function DayColumn({ day, jobs, isToday, isSelected, onJobClick, onFocusDay }) {
-  const dow = day.toLocaleDateString('en-NZ', { weekday: 'short' }).toUpperCase()
-  const visible = jobs.slice(0, MAX_VISIBLE_STOPS_PER_DAY)
-  const hiddenCount = Math.max(0, jobs.length - visible.length)
-  const count = jobs.length
-  return (
-    <div className="min-h-[220px] flex flex-col">
-      {count > 0 ? (
-        <button
-          type="button"
-          onClick={() => onFocusDay?.(day)}
-          className={cn(
-            'text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50',
-            // Selection follows the operator's click. Today keeps its
-            // brand-coloured date number (below) regardless, so today
-            // is always identifiable even when a different day is
-            // selected.
-            isSelected && 'bg-brand-50 dark:bg-brand-950/30 ring-1 ring-inset ring-brand-200/70 dark:ring-brand-800/40',
-          )}
-          aria-label={`Open all ${count} jobs for ${day.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className={cn(
-              'text-[10px] font-semibold uppercase tracking-wider',
-              isToday ? 'text-brand-700 dark:text-brand-400' : 'text-gray-400 dark:text-gray-500',
-            )}>{dow}</p>
-            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-[10px] font-bold tabular-nums text-gray-600 dark:text-gray-400">
-              {count}
-            </span>
-          </div>
-          <p className={cn(
-            'text-2xl font-bold leading-none mt-0.5',
-            isToday ? 'text-brand-700 dark:text-brand-300' : 'text-gray-900 dark:text-gray-100',
-          )}>
-            {day.getDate()}
-          </p>
-        </button>
-      ) : (
-        <div className={cn(
-          'px-3 py-2 border-b border-gray-100 dark:border-gray-800',
-          isSelected && 'bg-brand-50 dark:bg-brand-950/30 ring-1 ring-inset ring-brand-200/70 dark:ring-brand-800/40',
-        )}>
-          <p className={cn(
-            'text-[10px] font-semibold uppercase tracking-wider',
-            isToday ? 'text-brand-700 dark:text-brand-400' : 'text-gray-400 dark:text-gray-500',
-          )}>{dow}</p>
-          <p className={cn(
-            'text-2xl font-bold leading-none mt-0.5',
-            isToday ? 'text-brand-700 dark:text-brand-300' : 'text-gray-900 dark:text-gray-100',
-          )}>
-            {day.getDate()}
-          </p>
-        </div>
-      )}
-      <div className="p-1.5 space-y-1 flex-1">
-        {visible.length === 0 ? (
-          <p className="text-center text-gray-300 dark:text-gray-700 text-sm py-6 select-none">—</p>
-        ) : (
-          <>
-            {visible.map(j => <InlineJobCard key={j.id} j={j} onClick={() => onJobClick(j)} />)}
-            {hiddenCount > 0 && (
-              <button
-                type="button"
-                onClick={() => onFocusDay?.(day)}
-                className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/40 transition-colors"
-              >
-                +{hiddenCount} more
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Compact card for the week-grid columns. Completed jobs render at
-// reduced opacity so a busy day visually separates "done" from
-// "still to do".
-function InlineJobCard({ j, onClick }) {
-  const isCompleted = j.status === 'completed'
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'block w-full text-left bg-brand-50/70 dark:bg-brand-950/30 border-l-[3px] border-brand-500 rounded-md px-2 py-1.5 hover:bg-brand-100/70 dark:hover:bg-brand-950/50 transition-colors',
-        isCompleted && 'opacity-50 hover:opacity-90',
-      )}
-    >
-      <div className={cn(
-        'text-[11px] font-semibold text-gray-900 dark:text-gray-100 leading-tight truncate',
-        isCompleted && 'line-through',
-      )}>
-        {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
-      </div>
-      {j.customer?.address && (
-        <div className="text-[9.5px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-          {[j.customer.address, j.customer.suburb].filter(Boolean).join(', ')}
-        </div>
-      )}
-    </button>
-  )
-}
-
-// ─── Mobile: single-day card list ──
-// Completed jobs render dimmed + line-through so the day's
-// remaining work stands out.
-function JobCard({ j, onClick }) {
-  const isCompleted = j.status === 'completed'
-  return (
-    <div className={cn(isCompleted && 'opacity-60')}>
-      <Card onClick={onClick}>
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant={badgeFor(JOB_TYPES, j.job_type)}>{labelFor(JOB_TYPES, j.job_type)}</Badge>
+    <div className="grid grid-cols-7 divide-x divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900 rounded-2xl shadow-card border border-gray-100 dark:border-gray-800 overflow-hidden">
+      {days.map(day => {
+        const jobs = byDay.get(day)
+        const hidden = jobs.length - MAX_VISIBLE_STOPS
+        return (
+          <div key={day} className="min-w-0 min-h-[220px]">
+            <button type="button" onClick={() => onFocusDay(day)} aria-label={`Show jobs for ${dayLabel(day)}`}
+              aria-pressed={day === selectedDay}
+              className={cn('w-full text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50',
+                day === selectedDay && 'bg-brand-50 dark:bg-brand-950/30 ring-1 ring-inset ring-brand-200 dark:ring-brand-800')}>
+              <div className="flex items-center justify-between gap-1">
+                <span className={cn('text-[10px] font-semibold uppercase tracking-wider', day === today ? 'text-brand-700 dark:text-brand-300' : 'text-gray-500 dark:text-gray-400')}>
+                  {formatCalendarDay(day, { weekday: 'short' })}
+                </span>
+                {jobs.length > 0 && <span className="text-[10px] font-bold tabular-nums rounded-full bg-gray-100 dark:bg-gray-800 px-1.5">{jobs.length}</span>}
+              </div>
+              <span className={cn('text-2xl font-bold', day === today && 'text-brand-700 dark:text-brand-300')}>{new Date(day).getUTCDate()}</span>
+            </button>
+            <div className="p-1.5 space-y-1">
+              {jobs.slice(0, MAX_VISIBLE_STOPS).map(job => (
+                <button key={job.id} type="button" onClick={() => onJobClick(job)}
+                  className={cn('block w-full text-left rounded-md border-l-[3px] border-brand-500 bg-brand-50/70 dark:bg-brand-950/30 px-2 py-1.5 hover:bg-brand-100 dark:hover:bg-brand-950/50',
+                    job.status === 'completed' && 'opacity-60')}>
+                  {job.scheduled_time && <p className="text-[10px] font-bold text-brand-700 dark:text-brand-300">{timeLabel(job)}</p>}
+                  <p className={cn('text-[11px] font-semibold truncate', job.status === 'completed' && 'line-through')}>{jobTitle(job)}</p>
+                  {jobAddress(job) && <p className="text-[10px] truncate text-gray-500 dark:text-gray-400">{jobAddress(job)}</p>}
+                  {job.notes?.trim() && <p className="text-[10px] mt-0.5 leading-snug line-clamp-2 text-gray-700 dark:text-gray-300">{job.notes}</p>}
+                </button>
+              ))}
+              {jobs.length === 0 && <p className="text-center text-sm py-6 text-gray-300 dark:text-gray-700">—</p>}
+              {hidden > 0 && <button type="button" onClick={() => onFocusDay(day)}
+                className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-950/40">+{hidden} more</button>}
             </div>
-            <p className={cn(
-              'font-medium text-gray-900 dark:text-gray-100 truncate',
-              isCompleted && 'line-through',
-            )}>
-              {j.customer?.name ? `${j.customer.name} · ${j.title}` : j.title}
-            </p>
-            {j.customer?.address && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 inline-flex items-center gap-1">
-                <User className="w-3 h-3" />{j.customer.name}
-              </p>
-            )}
           </div>
-          <Badge variant={badgeFor(JOB_STATUSES, j.status)} dot>{labelFor(JOB_STATUSES, j.status)}</Badge>
-        </div>
-      </Card>
+        )
+      })}
     </div>
+  )
+}
+
+function DayJobs({ day, today, jobs, onOpen, onSetTime, onReorder }) {
+  const manual = jobs.some(job => job.schedule_order != null)
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">{day === today ? "Today's jobs" : dayLabel(day)}</h2>
+          {jobs.length > 0 && <p className="text-xs text-gray-500 dark:text-gray-400">{jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} · {manual ? 'Manual order' : 'Time order'}</p>}
+        </div>
+        {(jobs.length > 1 || manual) && <Button size="sm" variant="secondary" leftIcon={ArrowDownUp} onClick={onReorder}>Reorder</Button>}
+      </div>
+      {jobs.length === 0 ? <EmptyState icon={Calendar} title="No jobs this day" description="Choose another day or add a job." /> : (
+        <ol className="divide-y divide-gray-100 dark:divide-gray-800">
+          {jobs.map((job, index) => (
+            <li key={job.id} className="flex flex-wrap items-start gap-x-3 gap-y-0 px-4 py-3">
+              <span className="mt-1 rounded-full flex items-center justify-center w-6 h-6 bg-gray-100 dark:bg-gray-800 text-xs font-semibold tabular-nums text-gray-600 dark:text-gray-300" aria-hidden="true">{index + 1}</span>
+              <button type="button" onClick={() => onOpen(job)} className="min-w-0 flex-1 text-left rounded-md hover:text-brand-700 dark:hover:text-brand-300">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className={cn('font-semibold break-words', job.status === 'completed' && 'line-through')}>{jobTitle(job)}</p>
+                  <Badge variant={badgeFor(JOB_TYPES, job.job_type)}>{labelFor(JOB_TYPES, job.job_type)}</Badge>
+                </div>
+                {jobAddress(job) && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{jobAddress(job)}</p>}
+                {job.notes?.trim() && <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap break-words">{job.notes}</p>}
+              </button>
+              <div className="flex flex-col items-end shrink-0 gap-1">
+                <Button size="sm" variant="secondary" leftIcon={Clock} onClick={() => onSetTime(job)}
+                  aria-label={`${job.scheduled_time ? 'Change' : 'Set'} start time for ${job.title}`}>
+                  {job.scheduled_time ? timeLabel(job) : 'Set time'}
+                </Button>
+                <Badge variant={badgeFor(JOB_STATUSES, job.status)} dot>{labelFor(JOB_STATUSES, job.status)}</Badge>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Card>
+  )
+}
+
+function JobTimeModal({ job, onClose, onSaved }) {
+  const initial = job.scheduled_time?.slice(0, 5) || ''
+  const [time, setTime] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function save(event) {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const { data, error } = await supabase.from('jobs').update({ scheduled_time: time || null })
+        .eq('id', job.id).eq('scheduled_date', job.scheduled_date).select(JOB_SELECT).maybeSingle()
+      if (error) throw error
+      if (!data) throw new Error('This job has moved. Refresh the schedule and try again.')
+      onSaved(data)
+    } catch (err) {
+      setError(err.message || 'Could not save the start time.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={saving ? undefined : onClose} title="Set start time" subtitle={job.title} size="sm">
+      <form onSubmit={save} className="space-y-4">
+        <Input type="time" label="Start time" aria-label="Start time" hint="Christchurch time. Leave blank for a flexible visit."
+          value={time} onChange={event => setTime(event.target.value)} disabled={saving} autoFocus />
+        {initial && time && <button type="button" className="text-sm font-semibold text-brand-700 dark:text-brand-300 hover:underline"
+          onClick={() => setTime('')} disabled={saving}>Clear time</button>}
+        {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button type="submit" loading={saving} disabled={time === initial}>Save time</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function ReorderModal({ day, jobs, onClose, onSaved, onStale }) {
+  const [order, setOrder] = useState(jobs)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [stale, setStale] = useState(false)
+  const manual = jobs.some(job => job.schedule_order != null)
+  const changed = order.some((job, index) => job.id !== jobs[index].id)
+
+  function move(index, delta) {
+    setOrder(current => {
+      const next = [...current]
+      const target = index + delta
+      next[index] = current[target]
+      next[target] = current[index]
+      return next
+    })
+  }
+
+  async function save(useTimeOrder) {
+    setSaving(true)
+    setError('')
+    try {
+      const { error } = await supabase.rpc('save_job_schedule_order', {
+        p_day: day,
+        p_job_ids: order.map(job => job.id),
+        p_use_time_order: useTimeOrder,
+      })
+      if (error) {
+        if (error.code === 'P0001') {
+          setStale(true)
+          onStale()
+          throw new Error('The jobs for this day have changed. Close and reopen Reorder to try again.')
+        }
+        throw error
+      }
+      onSaved()
+    } catch (err) {
+      setError(err.message || 'Could not save the job order.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={saving ? undefined : onClose} title="Reorder jobs" subtitle={dayLabel(day)}>
+      <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Use the arrows to set your run order. Each job keeps its start time.</p>
+      <ol className="divide-y divide-gray-100 dark:divide-gray-800">
+        {order.map((job, index) => (
+          <li key={job.id} className="flex items-center gap-2 py-2">
+            <span className="w-6 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 tabular-nums">{index + 1}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold break-words">{jobTitle(job)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{timeLabel(job)}</p>
+            </div>
+            <button type="button" aria-label={`Move ${job.title} up`} disabled={index === 0 || saving || stale}
+              onClick={() => move(index, -1)} className={pagerClass}><ArrowUp className="w-4 h-4" /></button>
+            <button type="button" aria-label={`Move ${job.title} down`} disabled={index === order.length - 1 || saving || stale}
+              onClick={() => move(index, 1)} className={pagerClass}><ArrowDown className="w-4 h-4" /></button>
+          </li>
+        ))}
+      </ol>
+      {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400 mt-3">{error}</p>}
+      <div className="flex flex-wrap items-center justify-end gap-2 mt-4">
+        {manual && <Button variant="ghost" className="mr-auto" onClick={() => save(true)} disabled={saving || stale}>Use time order</Button>}
+        <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button onClick={() => save(false)} loading={saving} disabled={!changed || stale}>Save order</Button>
+      </div>
+    </Modal>
   )
 }

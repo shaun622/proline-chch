@@ -11,7 +11,7 @@ import Badge from '../components/ui/Badge'
 import NewJobModal from '../components/modals/NewJobModal'
 import { supabase } from '../lib/supabase'
 import { badgeFor, JOB_STATUSES, JOB_TYPES, labelFor } from '../lib/constants'
-import { formatDate } from '../lib/utils'
+import { formatJobSchedule } from '../lib/jobSchedule'
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([])
@@ -119,7 +119,7 @@ export default function Jobs() {
                   <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{j.title}</p>
                   <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {j.customer?.name && <span className="inline-flex items-center gap-1 truncate"><User className="w-3 h-3 shrink-0" />{j.customer.name}</span>}
-                    {j.scheduled_date && <span className="inline-flex items-center gap-1 shrink-0"><Calendar className="w-3 h-3" />{formatDate(j.scheduled_date)}</span>}
+                    {j.scheduled_date && <span className="inline-flex items-center gap-1 shrink-0"><Calendar className="w-3 h-3" />{formatJobSchedule(j)}</span>}
                   </div>
                 </div>
                 <div className="shrink-0">

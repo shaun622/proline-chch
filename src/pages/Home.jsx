@@ -13,13 +13,7 @@ import { supabase } from '../lib/supabase'
 import { useBusiness } from '../hooks/useBusiness'
 import { badgeFor, JOB_STATUSES, JOB_TYPES, labelFor } from '../lib/constants'
 import { currency, formatDate } from '../lib/utils'
-
-function startOfDay(d = new Date()) {
-  const x = new Date(d); x.setHours(0, 0, 0, 0); return x
-}
-function endOfDay(d = new Date()) {
-  const x = new Date(d); x.setHours(23, 59, 59, 999); return x
-}
+import { addCalendarDays, compareScheduledJobs, formatCalendarDay, formatJobTime, jobDay, jobDayStart } from '../lib/jobSchedule'
 
 export default function Home() {
   const nav = useNavigate()
@@ -30,16 +24,16 @@ export default function Home() {
   const [newJobOpen, setNewJobOpen] = useState(false)
 
   const load = useCallback(async () => {
-    const nowIso = new Date().toISOString()
-    const dayStart = startOfDay().toISOString()
-    const dayEnd = endOfDay().toISOString()
-    const today = new Date().toISOString().slice(0, 10)
+    const today = jobDay()
+    const dayStart = jobDayStart(today)
+    const dayEnd = jobDayStart(addCalendarDays(today, 1))
+    const invoiceDate = new Date().toISOString().slice(0, 10)
     const [todayJobs, inProgress, quotesSent, invoicesUnpaid, overdues] = await Promise.all([
-      supabase.from('jobs').select('*, customer:customer_id(id,name)').gte('scheduled_date', dayStart).lte('scheduled_date', dayEnd).order('scheduled_date'),
+      supabase.from('jobs').select('*, customer:customer_id(id,name)').gte('scheduled_date', dayStart).lt('scheduled_date', dayEnd),
       supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'in_progress'),
       supabase.from('quotes').select('total').eq('status', 'sent'),
       supabase.from('invoices').select('total').in('status', ['sent']),
-      supabase.from('invoices').select('*, customer:customer_id(id,name)').eq('status', 'sent').lt('due_date', today).order('due_date').limit(5),
+      supabase.from('invoices').select('*, customer:customer_id(id,name)').eq('status', 'sent').lt('due_date', invoiceDate).order('due_date').limit(5),
     ])
     const outstanding = (invoicesUnpaid.data || []).reduce((s, r) => s + Number(r.total || 0), 0)
     const quotesPending = (quotesSent.data || []).reduce((s, r) => s + Number(r.total || 0), 0)
@@ -49,7 +43,7 @@ export default function Home() {
       jobsInProgress: inProgress.count || 0,
       jobsToday: (todayJobs.data || []).length,
     })
-    setToday(todayJobs.data || [])
+    setToday((todayJobs.data || []).sort(compareScheduledJobs))
     setOverdueInvoices(overdues.data || [])
   }, [])
 
@@ -68,7 +62,7 @@ export default function Home() {
     <PageWrapper width="wide">
       <PageHero
         title={`${greeting}, Michael`}
-        subtitle={new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+        subtitle={formatCalendarDay(jobDay(), { weekday: 'long', day: 'numeric', month: 'long' })}
         action={<Button leftIcon={Plus} onClick={() => setNewJobOpen(true)}>New Job</Button>}
       />
 
@@ -120,6 +114,7 @@ export default function Home() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant={badgeFor(JOB_TYPES, j.job_type)}>{labelFor(JOB_TYPES, j.job_type)}</Badge>
+                      {j.scheduled_time && <span className="text-xs font-semibold text-brand-700 dark:text-brand-300">{formatJobTime(j.scheduled_time)}</span>}
                     </div>
                     <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{j.title}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{j.customer?.name}</p>
